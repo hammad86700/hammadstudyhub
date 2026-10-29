@@ -1,0 +1,41 @@
+{
+  "name": "Hammad StudyHub",
+  "short_name": "StudyHub",
+  "description": "Your studies, organized in one place. One platform. Every subject. Every lesson. Created by Muhammad Hammad.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1324",
+  "theme_color": "#1e3a8a",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Explore Subjects",
+      "url": "/subjects",
+      "description": "Browse all academic subjects"
+    },
+    {
+      "name": "Global Search",
+      "url": "/search",
+      "description": "Quickly search notes, lectures, and past papers"
+    },
+    {
+      "name": "Saved Bookmarks",
+      "url": "/bookmarks",
+      "description": "View your saved study materials"
+    }
+  ]
+}

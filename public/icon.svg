@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E3A8A" />
+      <stop offset="50%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#0A0F1D" />
+    </linearGradient>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="50%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#shieldGrad)" stroke="#3B82F6" stroke-width="4" stroke-opacity="0.3" filter="url(#shadow)" />
+  <path d="M128 360 C180 340, 230 350, 256 370 C282 350, 332 340, 384 360 C384 270, 384 230, 384 200 C332 180, 282 190, 256 210 C230 190, 180 180, 128 200 Z" fill="#1E293B" opacity="0.6"/>
+  <rect x="176" y="160" width="40" height="192" rx="12" fill="url(#brandGrad)" />
+  <rect x="296" y="160" width="40" height="192" rx="12" fill="url(#brandGrad)" />
+  <path d="M188 256 L324 256" stroke="url(#goldGrad)" stroke-width="36" stroke-linecap="round" />
+  <path d="M256 100 L264 124 L288 132 L264 140 L256 164 L248 140 L224 132 L248 124 Z" fill="url(#goldGrad)" />
+  <circle cx="256" cy="132" r="4" fill="#FFFFFF" />
+</svg>
