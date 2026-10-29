@@ -149,6 +149,11 @@ export function isChecklistCompleted(id: string): boolean {
   return !!item?.isCompleted;
 }
 
+export function clearChecklist(): void {
+  safeSetItem(CHECKLIST_KEY, JSON.stringify([]));
+  window.dispatchEvent(new Event('studyhub_checklist_updated'));
+}
+
 // -----------------------------------------------------------------------------
 // 4. THEME PREFERENCE
 // -----------------------------------------------------------------------------

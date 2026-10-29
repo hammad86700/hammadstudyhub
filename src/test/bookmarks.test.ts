@@ -12,6 +12,8 @@ import {
   addRecentlyViewed,
   toggleChecklistItem,
   isChecklistCompleted,
+  clearChecklist,
+  getChecklist,
 } from '../lib/storage';
 
 describe('Local Bookmarks Manager', () => {
@@ -87,5 +89,14 @@ describe('Study Revision Checklist', () => {
     const secondToggle = toggleChecklistItem('res-chk-1', 'cs-101', 'Loops Lesson');
     expect(secondToggle).toBe(false);
     expect(isChecklistCompleted('res-chk-1')).toBe(false);
+  });
+
+  it('clears all completed items from checklist', () => {
+    toggleChecklistItem('res-chk-2', 'cs-102', 'K-Maps');
+    expect(isChecklistCompleted('res-chk-2')).toBe(true);
+
+    clearChecklist();
+    expect(getChecklist()).toEqual([]);
+    expect(isChecklistCompleted('res-chk-2')).toBe(false);
   });
 });
