@@ -215,3 +215,4 @@ export const SharedMaterialsDrawer: React.FC<SharedMaterialsDrawerProps> = ({
     </div>
   );
 };
+
