@@ -19,6 +19,7 @@ import {
   X,
   Layers,
   ArrowUpDown,
+  MessageCircle,
 } from 'lucide-react';
 import { ResourceType, ResourceFilters } from '../types';
 import { useSubject } from '../hooks/useSubjects';
@@ -28,6 +29,7 @@ import { Breadcrumb } from '../components/common/Breadcrumb';
 import { SEOHead } from '../components/common/SEOHead';
 import { EmptyState } from '../components/common/EmptyState';
 import { ResourceListSkeleton } from '../components/common/LoadingSkeleton';
+import { ContactAdminModal } from '../components/common/ContactAdminModal';
 
 export const SubjectDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -40,6 +42,8 @@ export const SubjectDetailPage: React.FC = () => {
     dateFrom: '',
     dateTo: '',
   });
+
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   const { data: subject, isLoading: subjectLoading } = useSubject(slug || '');
   const { data: resources, isLoading: resourcesLoading } = useResources(subject?.id || slug, filters);
@@ -133,9 +137,19 @@ export const SubjectDetailPage: React.FC = () => {
               </span>
             )}
           </div>
-          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 dark:bg-navy-950 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
-            {resources?.length ?? 0} Published {resources?.length === 1 ? 'Resource' : 'Resources'}
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setContactModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold transition-colors"
+              title="Request missing lecture notes or worksheets directly from Muhammad Hammad"
+            >
+              <MessageCircle className="w-3.5 h-3.5 fill-current text-emerald-600" />
+              <span>Request Notes on WhatsApp</span>
+            </button>
+            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 dark:bg-navy-950 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
+              {resources?.length ?? 0} Published {resources?.length === 1 ? 'Resource' : 'Resources'}
+            </span>
+          </div>
         </div>
 
         <div>
@@ -274,6 +288,13 @@ export const SubjectDetailPage: React.FC = () => {
           />
         )}
       </section>
+
+      {/* Direct Contact Modal */}
+      <ContactAdminModal
+        isOpen={contactModalOpen}
+        onClose={() => setContactModalOpen(false)}
+        initialTopic={subject.name}
+      />
     </div>
   );
 };

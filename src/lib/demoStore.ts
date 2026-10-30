@@ -1,9 +1,20 @@
 // ==============================================================================
 // HAMMAD STUDYHUB — STORE (LOCAL PERSISTENCE ADAPTER)
-// Zero dummy data. Provides client-side persistence for administrator-created content.
+// Zero dummy data. Provides client-side persistence for administrator, student
+// accounts, CR/GR roles, social contact links, and gender-aware chat.
 // ==============================================================================
 
-import { Subject, Resource, Announcement, FeedbackSubmission } from '../types';
+import {
+  Subject,
+  Resource,
+  Announcement,
+  FeedbackSubmission,
+  UserProfile,
+  StudentRegistrationInput,
+  PlatformSocials,
+  ChatMessage,
+  UserRole,
+} from '../types';
 import {
   INITIAL_DEMO_SUBJECTS,
   INITIAL_DEMO_RESOURCES,
@@ -14,32 +25,32 @@ const SUBJECTS_KEY = 'studyhub_subjects_clean';
 const RESOURCES_KEY = 'studyhub_resources_clean';
 const ANNOUNCEMENTS_KEY = 'studyhub_announcements_clean';
 const FEEDBACK_KEY = 'studyhub_feedback_clean';
+const STUDENTS_KEY = 'studyhub_students_v3';
+const SOCIALS_KEY = 'studyhub_socials_v3';
+const CHATS_KEY = 'studyhub_chats_v3';
 
-// Automatically clean up any legacy dummy data from previous sessions
-try {
-  localStorage.removeItem('studyhub_demo_subjects_v1');
-  localStorage.removeItem('studyhub_demo_resources_v1');
-  localStorage.removeItem('studyhub_demo_announcements_v1');
-  localStorage.removeItem('studyhub_demo_feedback_v1');
-  localStorage.removeItem('studyhub_demo_admin_auth');
-} catch {
-  // Ignore in environments without window/localStorage
-}
+// Default social media contact links for Muhammad Hammad
+export const DEFAULT_SOCIALS: PlatformSocials = {
+  whatsapp_number: '03242779514',
+  instagram_id: 'not_urs_hammi',
+  whatsapp_url: 'https://wa.me/923242779514?text=Hello%20Muhammad%20Hammad,%20I%20am%20a%20student%20on%20Hammad%20StudyHub%20and%20need%20learning%20materials.',
+  instagram_url: 'https://instagram.com/not_urs_hammi',
+};
 
-function getStoredOrInit<T>(key: string, initial: T[]): T[] {
+function getStoredOrInit<T>(key: string, initial: T): T {
   try {
     const item = localStorage.getItem(key);
     if (!item) {
       localStorage.setItem(key, JSON.stringify(initial));
       return initial;
     }
-    return JSON.parse(item) as T[];
+    return JSON.parse(item) as T;
   } catch {
     return initial;
   }
 }
 
-function setStored<T>(key: string, data: T[]): void {
+function setStored<T>(key: string, data: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
@@ -51,7 +62,7 @@ function setStored<T>(key: string, data: T[]): void {
 // SUBJECTS
 // -----------------------------------------------------------------------------
 export function getDemoSubjects(): Subject[] {
-  return getStoredOrInit<Subject>(SUBJECTS_KEY, INITIAL_DEMO_SUBJECTS);
+  return getStoredOrInit<Subject[]>(SUBJECTS_KEY, INITIAL_DEMO_SUBJECTS);
 }
 
 export function saveDemoSubject(subject: Subject): Subject {
@@ -77,7 +88,7 @@ export function deleteDemoSubject(id: string): void {
 // RESOURCES
 // -----------------------------------------------------------------------------
 export function getDemoResources(): Resource[] {
-  return getStoredOrInit<Resource>(RESOURCES_KEY, INITIAL_DEMO_RESOURCES);
+  return getStoredOrInit<Resource[]>(RESOURCES_KEY, INITIAL_DEMO_RESOURCES);
 }
 
 export function saveDemoResource(resource: Resource): Resource {
@@ -99,23 +110,11 @@ export function deleteDemoResource(id: string): void {
   setStored(RESOURCES_KEY, list.filter((r) => r.id !== id));
 }
 
-export function clearAllStoredData(): void {
-  localStorage.setItem(SUBJECTS_KEY, JSON.stringify([]));
-  localStorage.setItem(RESOURCES_KEY, JSON.stringify([]));
-  localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify([]));
-  localStorage.setItem(FEEDBACK_KEY, JSON.stringify([]));
-  window.location.reload();
-}
-
-export function resetDemoData(): void {
-  clearAllStoredData();
-}
-
 // -----------------------------------------------------------------------------
 // ANNOUNCEMENTS
 // -----------------------------------------------------------------------------
 export function getDemoAnnouncements(): Announcement[] {
-  return getStoredOrInit<Announcement>(ANNOUNCEMENTS_KEY, INITIAL_DEMO_ANNOUNCEMENTS);
+  return getStoredOrInit<Announcement[]>(ANNOUNCEMENTS_KEY, INITIAL_DEMO_ANNOUNCEMENTS);
 }
 
 export function saveDemoAnnouncement(announcement: Announcement): Announcement {
@@ -141,7 +140,7 @@ export function deleteDemoAnnouncement(id: string): void {
 // FEEDBACK
 // -----------------------------------------------------------------------------
 export function submitDemoFeedback(feedback: FeedbackSubmission): void {
-  const list = getStoredOrInit<FeedbackSubmission>(FEEDBACK_KEY, []);
+  const list = getStoredOrInit<FeedbackSubmission[]>(FEEDBACK_KEY, []);
   list.unshift({
     ...feedback,
     id: `fb_${Date.now()}`,
@@ -152,5 +151,182 @@ export function submitDemoFeedback(feedback: FeedbackSubmission): void {
 }
 
 export function getDemoFeedback(): FeedbackSubmission[] {
-  return getStoredOrInit<FeedbackSubmission>(FEEDBACK_KEY, []);
+  return getStoredOrInit<FeedbackSubmission[]>(FEEDBACK_KEY, []);
+}
+
+// -----------------------------------------------------------------------------
+// STUDENT REGISTRATION & DIRECTORY
+// -----------------------------------------------------------------------------
+export interface RegisteredStudentEntry extends UserProfile {
+  password?: string;
+}
+
+export function getRegisteredStudents(): RegisteredStudentEntry[] {
+  return getStoredOrInit<RegisteredStudentEntry[]>(STUDENTS_KEY, []);
+}
+
+export function registerStudent(input: StudentRegistrationInput): UserProfile {
+  const students = getRegisteredStudents();
+  const existing = students.find((s) => s.email.toLowerCase() === input.email.trim().toLowerCase());
+  if (existing) {
+    throw new Error('An account with this email address already exists. Please log in.');
+  }
+
+  const now = new Date().toISOString();
+  const newStudent: RegisteredStudentEntry = {
+    id: `student_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    display_name: input.display_name.trim(),
+    email: input.email.trim().toLowerCase(),
+    password: input.password,
+    role: 'student', // Initial role is always student. Admin appoints CR or GR.
+    gender: input.gender,
+    phone: input.phone?.trim() || '',
+    roll_no: input.roll_no?.trim() || '',
+    program_name: input.program_name?.trim() || '',
+    semester: input.semester?.trim() || '',
+    created_at: now,
+    updated_at: now,
+  };
+
+  students.unshift(newStudent);
+  setStored(STUDENTS_KEY, students);
+  window.dispatchEvent(new Event('studyhub_students_updated'));
+
+  // Return safe profile without password
+  const { password, ...safeProfile } = newStudent;
+  return safeProfile;
+}
+
+export function updateStudentRole(studentId: string, newRole: 'student' | 'cr' | 'gr'): void {
+  const students = getRegisteredStudents();
+  const index = students.findIndex((s) => s.id === studentId);
+  if (index >= 0) {
+    // If appointing a new CR or GR, ensure only one active CR / GR exists per appointment if desired, or allow multiple
+    students[index].role = newRole;
+    students[index].updated_at = new Date().toISOString();
+    setStored(STUDENTS_KEY, students);
+    window.dispatchEvent(new Event('studyhub_students_updated'));
+  }
+}
+
+export function deleteStudent(studentId: string): void {
+  const students = getRegisteredStudents();
+  setStored(STUDENTS_KEY, students.filter((s) => s.id !== studentId));
+  window.dispatchEvent(new Event('studyhub_students_updated'));
+}
+
+export function findStudentByEmail(email: string): RegisteredStudentEntry | undefined {
+  const students = getRegisteredStudents();
+  return students.find((s) => s.email.toLowerCase() === email.trim().toLowerCase());
+}
+
+export function getActiveCR(): UserProfile | undefined {
+  const students = getRegisteredStudents();
+  return students.find((s) => s.role === 'cr');
+}
+
+export function getActiveGR(): UserProfile | undefined {
+  const students = getRegisteredStudents();
+  return students.find((s) => s.role === 'gr');
+}
+
+// -----------------------------------------------------------------------------
+// SOCIAL MEDIA CONTACT LINKS (ADMIN MANAGED)
+// -----------------------------------------------------------------------------
+export function getPlatformSocials(): PlatformSocials {
+  const data = getStoredOrInit<PlatformSocials>(SOCIALS_KEY, DEFAULT_SOCIALS);
+  // Ensure formatted URLs
+  const cleanPhone = (data.whatsapp_number || '03242779514').replace(/\D/g, '');
+  const intlPhone = cleanPhone.startsWith('0') ? '92' + cleanPhone.substring(1) : cleanPhone;
+  const cleanInsta = (data.instagram_id || 'not_urs_hammi').replace('@', '').trim();
+
+  return {
+    ...data,
+    whatsapp_url: `https://wa.me/${intlPhone}?text=Hello%20Muhammad%20Hammad,%20I%20am%20using%20Hammad%20StudyHub%20and%20would%20like%20to%20request%20learning%20materials.`,
+    instagram_url: `https://instagram.com/${cleanInsta}`,
+  };
+}
+
+export function savePlatformSocials(socials: Partial<PlatformSocials>): PlatformSocials {
+  const current = getPlatformSocials();
+  const updated: PlatformSocials = {
+    ...current,
+    whatsapp_number: socials.whatsapp_number?.trim() || current.whatsapp_number,
+    instagram_id: socials.instagram_id?.replace('@', '').trim() || current.instagram_id,
+  };
+
+  const cleanPhone = updated.whatsapp_number.replace(/\D/g, '');
+  const intlPhone = cleanPhone.startsWith('0') ? '92' + cleanPhone.substring(1) : cleanPhone;
+  const cleanInsta = updated.instagram_id.replace('@', '').trim();
+  updated.whatsapp_url = `https://wa.me/${intlPhone}?text=Hello%20Muhammad%20Hammad,%20I%20am%20using%20Hammad%20StudyHub%20and%20would%20like%20to%20request%20learning%20materials.`;
+  updated.instagram_url = `https://instagram.com/${cleanInsta}`;
+
+  setStored(SOCIALS_KEY, updated);
+  window.dispatchEvent(new Event('studyhub_socials_updated'));
+  return updated;
+}
+
+// -----------------------------------------------------------------------------
+// CHAT & IN-PLATFORM MESSAGING
+// -----------------------------------------------------------------------------
+export function getAllChatMessages(): ChatMessage[] {
+  return getStoredOrInit<ChatMessage[]>(CHATS_KEY, []);
+}
+
+export function getConversationMessages(userId1: string, userId2: string): ChatMessage[] {
+  const all = getAllChatMessages();
+  return all.filter(
+    (m) =>
+      (m.sender_id === userId1 && m.receiver_id === userId2) ||
+      (m.sender_id === userId2 && m.receiver_id === userId1)
+  );
+}
+
+export function sendChatMessage(data: {
+  sender_id: string;
+  sender_name: string;
+  sender_role: UserRole;
+  sender_gender?: 'male' | 'female';
+  receiver_id: string;
+  receiver_name: string;
+  receiver_role: UserRole;
+  message: string;
+}): ChatMessage {
+  const all = getAllChatMessages();
+  const newMsg: ChatMessage = {
+    id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    sender_id: data.sender_id,
+    sender_name: data.sender_name,
+    sender_role: data.sender_role,
+    sender_gender: data.sender_gender,
+    receiver_id: data.receiver_id,
+    receiver_name: data.receiver_name,
+    receiver_role: data.receiver_role,
+    message: data.message.trim(),
+    created_at: new Date().toISOString(),
+    read: false,
+  };
+
+  all.push(newMsg);
+  setStored(CHATS_KEY, all);
+  window.dispatchEvent(new Event('studyhub_chat_updated'));
+  return newMsg;
+}
+
+// -----------------------------------------------------------------------------
+// CLEAR / RESET STORE
+// -----------------------------------------------------------------------------
+export function clearAllStoredData(): void {
+  localStorage.setItem(SUBJECTS_KEY, JSON.stringify([]));
+  localStorage.setItem(RESOURCES_KEY, JSON.stringify([]));
+  localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify([]));
+  localStorage.setItem(FEEDBACK_KEY, JSON.stringify([]));
+  localStorage.setItem(STUDENTS_KEY, JSON.stringify([]));
+  localStorage.setItem(CHATS_KEY, JSON.stringify([]));
+  localStorage.setItem(SOCIALS_KEY, JSON.stringify(DEFAULT_SOCIALS));
+  window.location.reload();
+}
+
+export function resetDemoData(): void {
+  clearAllStoredData();
 }

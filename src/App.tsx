@@ -13,7 +13,7 @@ import { AuthProvider } from './context/AuthContext';
 import { PublicLayout } from './components/layout/PublicLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
 
-// Public Pages
+// Public & Student Pages
 import { HomePage } from './pages/HomePage';
 import { SubjectsPage } from './pages/SubjectsPage';
 import { SubjectDetailPage } from './pages/SubjectDetailPage';
@@ -27,6 +27,9 @@ import { FeedbackPage } from './pages/FeedbackPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { TermsPage } from './pages/TermsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { StudentSignupPage } from './pages/StudentSignupPage';
+import { StudentLoginPage } from './pages/StudentLoginPage';
+import { ChatPage } from './pages/ChatPage';
 
 // Admin Pages
 import { AdminLoginPage } from './pages/admin/AdminLoginPage';
@@ -34,6 +37,7 @@ import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { AdminSubjectsPage } from './pages/admin/AdminSubjectsPage';
 import { AdminResourcesPage } from './pages/admin/AdminResourcesPage';
 import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
+import { AdminStudentsPage } from './pages/admin/AdminStudentsPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 
 // Configure TanStack Query
@@ -68,16 +72,20 @@ export const App: React.FC = () => {
                 <Route path="/feedback" element={<FeedbackPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms" element={<TermsPage />} />
+                <Route path="/signup" element={<StudentSignupPage />} />
+                <Route path="/login" element={<StudentLoginPage />} />
+                <Route path="/chat" element={<ChatPage />} />
                 <Route path="/admin/login" element={<AdminLoginPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
 
-              {/* Protected Administrator Routes */}
+              {/* Protected Administrator & Representative Routes */}
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="subjects" element={<AdminSubjectsPage />} />
                 <Route path="resources" element={<AdminResourcesPage />} />
                 <Route path="announcements" element={<AdminAnnouncementsPage />} />
+                <Route path="students" element={<AdminStudentsPage />} />
                 <Route path="settings" element={<AdminSettingsPage />} />
               </Route>
             </Routes>

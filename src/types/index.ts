@@ -19,14 +19,53 @@ export type SourceProvider =
 
 export type PublicationStatus = 'draft' | 'published' | 'archived';
 
-export type UserRole = 'admin' | 'student';
+export type UserRole = 'admin' | 'cr' | 'gr' | 'student';
+export type Gender = 'male' | 'female';
 
 export interface UserProfile {
   id: string;
   display_name: string;
+  email: string;
   role: UserRole;
+  gender: Gender;
+  phone?: string;
+  roll_no?: string;
+  program_name?: string;
+  semester?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface StudentRegistrationInput {
+  display_name: string;
+  email: string;
+  password: string;
+  gender: Gender;
+  phone?: string;
+  roll_no?: string;
+  program_name?: string;
+  semester?: string;
+}
+
+export interface PlatformSocials {
+  whatsapp_number: string;
+  instagram_id: string;
+  whatsapp_url?: string;
+  instagram_url?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_role: UserRole;
+  sender_gender?: Gender;
+  receiver_id: string;
+  receiver_name: string;
+  receiver_role: UserRole;
+  message: string;
+  created_at: string;
+  read?: boolean;
 }
 
 export interface Institution {

@@ -19,6 +19,7 @@ import {
   Copy,
   Info,
   Flag,
+  MessageCircle,
 } from 'lucide-react';
 import { Resource } from '../../types';
 import { formatLessonDate, formatRelativeTime, getResourceTypeMeta } from '../../lib/utils';
@@ -28,6 +29,7 @@ import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { Breadcrumb } from '../common/Breadcrumb';
 import { ReportModal } from './ReportModal';
+import { ContactAdminModal } from '../common/ContactAdminModal';
 
 interface ResourceViewerProps {
   resource: Resource;
@@ -42,6 +44,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
   const [completed, setCompleted] = useState(() => isChecklistCompleted(resource.id));
   const [copied, setCopied] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const [iframeError, setIframeError] = useState(false);
 
   const meta = getResourceTypeMeta(resource.resource_type);
@@ -145,6 +148,16 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
               leftIcon={copied ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
             >
               {copied ? 'Copied Link!' : 'Share'}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setContactModalOpen(true)}
+              className="text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30"
+              leftIcon={<MessageCircle className="w-4 h-4 fill-current text-emerald-600" />}
+            >
+              Contact Admin
             </Button>
 
             <button
@@ -302,6 +315,13 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
         onClose={() => setReportModalOpen(false)}
         resourceId={resource.id}
         resourceTitle={resource.title}
+      />
+
+      {/* Direct Contact Admin Modal */}
+      <ContactAdminModal
+        isOpen={contactModalOpen}
+        onClose={() => setContactModalOpen(false)}
+        initialTopic={resource.title}
       />
     </article>
   );

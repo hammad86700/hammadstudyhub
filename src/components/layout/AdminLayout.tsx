@@ -1,5 +1,7 @@
 // ==============================================================================
-// HAMMAD STUDYHUB — PROTECTED ADMIN LAYOUT
+// HAMMAD STUDYHUB — PROTECTED MANAGEMENT LAYOUT (ADMIN, CR, & GR)
+// - Admin: Access to all features, student directory, social links, settings
+// - CR & GR: Access to study resource upload/edit, subjects, and announcements
 // ==============================================================================
 
 import React, { useState } from 'react';
@@ -10,6 +12,7 @@ import {
   FileText,
   Bell,
   Settings,
+  Users,
   LogOut,
   ExternalLink,
   Menu,
@@ -17,14 +20,17 @@ import {
   Sun,
   Moon,
   ShieldCheck,
+  Crown,
+  Award,
   Database,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Button } from '../common/Button';
 
 export const AdminLayout: React.FC = () => {
-  const { user, profile, isAdmin, isLoading, isDemoMode, signOut } = useAuth();
+  const { user, profile, isAdmin, isCR, isGR, isStudyManager, isLoading, isDemoMode, signOut } = useAuth();
   const { resolvedTheme, toggleTheme } = useTheme();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const location = useLocation();
@@ -34,23 +40,30 @@ export const AdminLayout: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-navy-950">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-slate-500 dark:text-slate-400">Verifying administrator authorization...</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Verifying authorization...</p>
         </div>
       </div>
     );
   }
 
-  // Route protection
-  if (!isAdmin) {
+  // Route protection: Only Admin, CR, or GR can access the management panel
+  if (!isStudyManager) {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
+  // Navigation Items according to role permissions
+  // CR and GR can manage study materials, but CANNOT see student data or admin settings
   const navItems = [
-    { label: 'Dashboard Overview', href: '/admin', icon: LayoutDashboard, exact: true },
-    { label: 'Subjects Management', href: '/admin/subjects', icon: BookOpen },
+    ...(isAdmin ? [{ label: 'Dashboard Overview', href: '/admin', icon: LayoutDashboard, exact: true }] : []),
     { label: 'Resource Management', href: '/admin/resources', icon: FileText },
+    { label: 'Subjects Management', href: '/admin/subjects', icon: BookOpen },
     { label: 'Announcements', href: '/admin/announcements', icon: Bell },
-    { label: 'Platform Settings', href: '/admin/settings', icon: Settings },
+    ...(isAdmin
+      ? [
+          { label: 'Student Directory & CR/GR', href: '/admin/students', icon: Users },
+          { label: 'Platform & Social Settings', href: '/admin/settings', icon: Settings },
+        ]
+      : []),
   ];
 
   return (
@@ -76,8 +89,14 @@ export const AdminLayout: React.FC = () => {
               H
             </div>
             <div>
-              <span className="font-bold text-sm text-white tracking-tight">StudyHub Admin</span>
-              <span className="block text-[10px] text-brand-400">Muhammad Hammad</span>
+              <span className="font-bold text-sm text-white tracking-tight">StudyHub Portal</span>
+              <span className="block text-[10px] text-brand-400">
+                {isAdmin
+                  ? 'Muhammad Hammad (Admin)'
+                  : isCR
+                  ? 'CR Study Portal'
+                  : 'GR Study Portal'}
+              </span>
             </div>
           </Link>
           <button
@@ -88,21 +107,35 @@ export const AdminLayout: React.FC = () => {
           </button>
         </div>
 
-        {/* Storage Mode Badge */}
-        {isDemoMode && (
-          <div className="m-3 p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-xs flex flex-col gap-1.5">
-            <div className="flex items-center gap-1.5 font-semibold text-[11px] text-brand-400">
-              <Database className="w-3.5 h-3.5" />
-              <span>Local Storage Active</span>
-            </div>
-            <p className="text-[10px] text-slate-400 leading-tight">
-              Published materials save directly in local storage. Connect Supabase in .env for multi-device sync.
-            </p>
+        {/* Role Privileges Badge */}
+        <div className="m-3 p-2.5 rounded-lg bg-slate-800/80 border border-slate-700/80 text-xs flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 font-bold text-[11px] text-white">
+            {isAdmin ? (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Master Administrator</span>
+              </>
+            ) : isCR ? (
+              <>
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span>Class Representative (CR)</span>
+              </>
+            ) : (
+              <>
+                <Award className="w-3.5 h-3.5 text-purple-400" />
+                <span>Girls Representative (GR)</span>
+              </>
+            )}
           </div>
-        )}
+          <p className="text-[10px] text-slate-400 leading-tight">
+            {isAdmin
+              ? 'Full platform authority: student records, CR/GR appointments & settings.'
+              : 'Authorized to upload, edit, and organize course notes, PDFs, and notices.'}
+          </p>
+        </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-3 space-y-1">
           {navItems.map((item) => (
             <NavLink
               key={item.href}
@@ -121,6 +154,15 @@ export const AdminLayout: React.FC = () => {
               <span>{item.label}</span>
             </NavLink>
           ))}
+
+          {/* Quick Chat Link */}
+          <NavLink
+            to="/chat"
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+          >
+            <MessageSquare className="w-4 h-4 shrink-0 text-brand-400" />
+            <span>Class Messages / Chat</span>
+          </NavLink>
         </nav>
 
         {/* Footer actions */}
@@ -144,7 +186,7 @@ export const AdminLayout: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Admin Top Header */}
+        {/* Top Header */}
         <header className="h-16 px-4 sm:px-6 bg-white dark:bg-navy-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
@@ -154,11 +196,31 @@ export const AdminLayout: React.FC = () => {
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <ShieldCheck className="w-4 h-4 text-emerald-500" />
-              <span className="hidden sm:inline font-medium">Administrator Session:</span>
-              <span className="font-semibold text-slate-800 dark:text-slate-200">
-                {profile?.display_name || user?.email || 'Muhammad Hammad'}
-              </span>
+              {isAdmin ? (
+                <>
+                  <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span className="hidden sm:inline font-medium">Administrator:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {profile?.display_name || 'Muhammad Hammad'}
+                  </span>
+                </>
+              ) : isCR ? (
+                <>
+                  <Crown className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span className="hidden sm:inline font-medium">Class Representative (CR):</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {profile?.display_name}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Award className="w-4 h-4 text-purple-500 shrink-0" />
+                  <span className="hidden sm:inline font-medium">Girls Representative (GR):</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {profile?.display_name}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 

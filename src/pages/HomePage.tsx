@@ -273,6 +273,43 @@ export const HomePage: React.FC = () => {
           )}
         </section>
 
+        {/* Direct Contact Admin for Learning Materials Section */}
+        <section className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-emerald-950 via-slate-900 to-navy-950 text-white border border-emerald-900/60 shadow-card flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold">
+              <span>Direct Student Support</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-extrabold text-white">
+              Need Specific Lecture Notes or Chapter PDFs?
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              If your desired chapter, worksheet, or whiteboard diagram isn&apos;t uploaded yet, contact Muhammad Hammad directly. Click below to reach out on WhatsApp or Instagram:
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap shrink-0">
+            <a
+              href="https://wa.me/923242779514?text=Hello%20Muhammad%20Hammad,%20I%20am%20studying%20on%20Hammad%20StudyHub%20and%20need%20learning%20materials."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition-transform hover:scale-105"
+            >
+              <span>WhatsApp Admin (03242779514)</span>
+              <ArrowRight className="w-4 h-4" />
+            </a>
+
+            <a
+              href="https://instagram.com/not_urs_hammi"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 hover:opacity-90 text-white shadow-md transition-transform hover:scale-105"
+            >
+              <span>Instagram (@not_urs_hammi)</span>
+              <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        </section>
+
         {/* Value Proposition / Callout */}
         <section className="p-8 sm:p-12 rounded-3xl bg-slate-900 text-white relative overflow-hidden shadow-card">
           <div className="max-w-3xl space-y-4 relative z-10">

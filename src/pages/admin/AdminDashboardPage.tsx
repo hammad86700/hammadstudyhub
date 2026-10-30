@@ -9,6 +9,7 @@ import { useSubjects, useSubjectMutations } from '../../hooks/useSubjects';
 import { useResources, useResourceMutations } from '../../hooks/useResources';
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 import { formatLessonDate, formatRelativeTime, getResourceTypeMeta } from '../../lib/utils';
+import { getRegisteredStudents } from '../../lib/demoStore';
 import { StatsOverview } from '../../components/admin/StatsOverview';
 import { ResourceFormModal } from '../../components/admin/ResourceFormModal';
 import { SubjectFormModal } from '../../components/admin/SubjectFormModal';
@@ -25,6 +26,13 @@ export const AdminDashboardPage: React.FC = () => {
   const { data: subjects = [] } = useSubjects();
   const { data: resources = [] } = useResources(undefined, undefined, { includeDrafts: true });
   const { data: announcements = [] } = useAnnouncements({ includeDrafts: true });
+  const [students, setStudents] = useState(() => getRegisteredStudents());
+
+  React.useEffect(() => {
+    const handleUpdate = () => setStudents(getRegisteredStudents());
+    window.addEventListener('studyhub_students_updated', handleUpdate);
+    return () => window.removeEventListener('studyhub_students_updated', handleUpdate);
+  }, []);
 
   const { createResource, bulkImportResources } = useResourceMutations();
   const { createSubject } = useSubjectMutations();
@@ -84,6 +92,7 @@ export const AdminDashboardPage: React.FC = () => {
         subjects={subjects}
         resources={resources}
         announcements={announcements}
+        studentCount={students.length}
         onNewResource={() => setResourceModalOpen(true)}
         onNewSubject={() => setSubjectModalOpen(true)}
         onBulkImport={() => setCsvModalOpen(true)}
