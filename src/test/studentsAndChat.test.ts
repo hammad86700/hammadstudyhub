@@ -15,8 +15,12 @@ import {
   getSharedMaterialsBetween,
   publishSharedMaterialToHub,
   getDemoResources,
+  saveDemoResource,
+  getDemoSubjects,
+  saveDemoSubject,
   clearAllStoredData,
 } from '../lib/demoStore';
+import { parseYouTubeUrl } from '../lib/googleDrive';
 
 describe('Student Registration and Role Management (CR & GR)', () => {
   beforeEach(() => {
@@ -208,6 +212,59 @@ describe('In-Platform Messaging & Gender-Aware Rules', () => {
 
     const libraryResources = getDemoResources();
     expect(libraryResources.some((r) => r.id === publishedResource.id)).toBe(true);
+  });
+
+  it('allows CR, GR, and Admin to add YouTube video lectures with title and optional description', () => {
+    const youtubeUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    const parsed = parseYouTubeUrl(youtubeUrl);
+    expect(parsed.isValid).toBe(true);
+    expect(parsed.embedUrl).toContain('youtube-nocookie.com/embed/dQw4w9WgXcQ');
+
+    const subject = {
+      id: 'subj_cs_101',
+      name: 'Computer Programming',
+      slug: 'computer-programming',
+      code: 'CS101',
+      icon: 'Code',
+      color: 'blue',
+      is_featured: true,
+      is_active: true,
+      sort_order: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    saveDemoSubject(subject);
+
+    const lecture = saveDemoResource({
+      id: 'res_yt_test_1',
+      subject_id: subject.id,
+      title: 'Lecture 1: Introduction to Variables and Memory in C++',
+      slug: 'lecture-1-intro-variables',
+      description: 'Optional lecture notes on memory allocation and data types.',
+      resource_type: 'video',
+      source_provider: 'youtube',
+      external_url: youtubeUrl,
+      embed_url: parsed.embedUrl,
+      lesson_date: '2026-10-30',
+      chapter: 'Chapter 1',
+      topic: 'Variables',
+      tags: ['YouTube Lecture', 'Video', 'Computer Programming'],
+      status: 'published',
+      published_at: new Date().toISOString(),
+      created_by: 'Muhammad Hammad (Admin)',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      subject,
+    });
+
+    expect(lecture.id).toBe('res_yt_test_1');
+    expect(lecture.resource_type).toBe('video');
+    expect(lecture.source_provider).toBe('youtube');
+    expect(lecture.embed_url).toBe(parsed.embedUrl);
+    expect(lecture.description).toBe('Optional lecture notes on memory allocation and data types.');
+
+    const all = getDemoResources();
+    expect(all.some((r) => r.id === 'res_yt_test_1' && r.source_provider === 'youtube')).toBe(true);
   });
 });
 

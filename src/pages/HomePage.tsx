@@ -23,6 +23,7 @@ import {
 import { useSubjects } from '../hooks/useSubjects';
 import { useLatestResources } from '../hooks/useResources';
 import { useAnnouncements } from '../hooks/useAnnouncements';
+import { useAuth } from '../context/AuthContext';
 import { getRecentlyViewed } from '../lib/storage';
 import { formatLessonDate } from '../lib/utils';
 import { SubjectCard } from '../components/subject/SubjectCard';
@@ -31,10 +32,12 @@ import { SEOHead } from '../components/common/SEOHead';
 import { Button } from '../components/common/Button';
 import { EmptyState } from '../components/common/EmptyState';
 import { SubjectCardSkeleton, ResourceListSkeleton } from '../components/common/LoadingSkeleton';
+import { StudyMaterialAuthGate } from '../components/common/StudyMaterialAuthGate';
 
 export const HomePage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
+  const { isLoggedIn, profile } = useAuth();
 
   const { data: subjects, isLoading: subjectsLoading } = useSubjects({ featuredOnly: true });
   const { data: latestResources, isLoading: resourcesLoading } = useLatestResources(6);
@@ -111,6 +114,30 @@ export const HomePage: React.FC = () => {
             </Button>
           </form>
 
+          {/* User Sign Up / Sign In CTA or Welcome Pill */}
+          {!isLoggedIn ? (
+            <div className="pt-2 flex items-center justify-center gap-3 flex-wrap">
+              <Link to="/signup">
+                <Button size="md" variant="primary" className="font-bold shadow-md shadow-brand-600/20">
+                  Create Student Account
+                </Button>
+              </Link>
+              <Link to="/login">
+                <Button size="md" variant="outline" className="font-bold bg-white dark:bg-navy-900">
+                  Student Sign In
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="pt-2 flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <span>Welcome back, <strong className="text-brand-600 dark:text-brand-400">{profile?.display_name}</strong></span>
+              <span>•</span>
+              <Link to="/chat" className="text-brand-600 dark:text-brand-400 hover:underline font-bold">
+                Open Class Chat &rarr;
+              </Link>
+            </div>
+          )}
+
           {/* Quick-Access Content Categories */}
           <div className="pt-4 flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
             {categories.map((cat) => {
@@ -154,8 +181,8 @@ export const HomePage: React.FC = () => {
           </aside>
         )}
 
-        {/* Recently Viewed Resources (When Local History Exists) */}
-        {recentItems.length > 0 && (
+        {/* Recently Viewed Resources (When Logged In and Local History Exists) */}
+        {isLoggedIn && recentItems.length > 0 && (
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -237,27 +264,34 @@ export const HomePage: React.FC = () => {
           )}
         </section>
 
-        {/* Latest Resources Feed */}
+        {/* Latest Resources Feed (Protected for Registered Students) */}
         <section className="space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
-                Latest Published Resources
+                Course Study Materials & Lectures
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                Freshly uploaded lecture notes, whiteboard photos, worksheets, and model solutions.
+                Daily classroom lecture notes, YouTube video explanations, PDFs, and model solutions.
               </p>
             </div>
-            <Link
-              to="/search"
-              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700"
-            >
-              <span>Browse All Resources</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            {isLoggedIn && (
+              <Link
+                to="/search"
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700"
+              >
+                <span>Browse All Resources</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
           </div>
 
-          {resourcesLoading ? (
+          {!isLoggedIn ? (
+            <StudyMaterialAuthGate
+              title="Student Sign-In Required for Study Materials"
+              description="To protect class resources and student coursework, full lecture notes, YouTube recordings, whiteboard photos, and past papers are reserved for registered students."
+            />
+          ) : resourcesLoading ? (
             <ResourceListSkeleton count={4} />
           ) : latestResources && latestResources.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

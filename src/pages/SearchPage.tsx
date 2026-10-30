@@ -8,14 +8,17 @@ import { Search, Filter, Calendar, X, BookOpen, Layers } from 'lucide-react';
 import { ResourceType } from '../types';
 import { useResources } from '../hooks/useResources';
 import { useSubjects } from '../hooks/useSubjects';
+import { useAuth } from '../context/AuthContext';
 import { ResourceCard } from '../components/resource/ResourceCard';
 import { SubjectCard } from '../components/subject/SubjectCard';
 import { SEOHead } from '../components/common/SEOHead';
 import { EmptyState } from '../components/common/EmptyState';
 import { ResourceListSkeleton } from '../components/common/LoadingSkeleton';
+import { StudyMaterialAuthGate } from '../components/common/StudyMaterialAuthGate';
 
 export const SearchPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isLoggedIn } = useAuth();
   const initialQuery = searchParams.get('q') || '';
   const initialType = (searchParams.get('type') || 'all') as ResourceType | 'all';
 
@@ -133,14 +136,19 @@ export const SearchPage: React.FC = () => {
             </div>
           )}
 
-          {/* Matched Resources */}
+          {/* Matched Resources (Protected for Registered Students) */}
           <div className="space-y-3">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-brand-600" />
               <span>Matched Study Materials ({resources?.length || 0})</span>
             </h3>
 
-            {resources && resources.length > 0 ? (
+            {!isLoggedIn ? (
+              <StudyMaterialAuthGate
+                title="Student Sign-In Required to View Matching Materials"
+                description="Matched lecture notes, YouTube recordings, and model solutions are protected. Please sign in or create an account to view and download these files."
+              />
+            ) : resources && resources.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {resources.map((res) => (
                   <ResourceCard key={res.id} resource={res} showSubjectBadge />

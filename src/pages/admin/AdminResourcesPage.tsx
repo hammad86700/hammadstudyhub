@@ -16,12 +16,14 @@ import {
   ExternalLink,
   Calendar,
   Filter,
+  Video,
 } from 'lucide-react';
 import { Resource, ResourceType } from '../../types';
 import { useSubjects } from '../../hooks/useSubjects';
 import { useResources, useResourceMutations } from '../../hooks/useResources';
 import { formatLessonDate, exportResourcesToCSV, getResourceTypeMeta } from '../../lib/utils';
 import { ResourceFormModal } from '../../components/admin/ResourceFormModal';
+import { AddYouTubeLectureModal } from '../../components/admin/AddYouTubeLectureModal';
 import { CsvBulkImportModal } from '../../components/admin/CsvBulkImportModal';
 import { SEOHead } from '../../components/common/SEOHead';
 import { Button } from '../../components/common/Button';
@@ -29,6 +31,7 @@ import { Card } from '../../components/common/Card';
 
 export const AdminResourcesPage: React.FC = () => {
   const [resourceModalOpen, setResourceModalOpen] = useState(false);
+  const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
 
@@ -125,6 +128,14 @@ export const AdminResourcesPage: React.FC = () => {
             leftIcon={<Upload className="w-3.5 h-3.5" />}
           >
             Bulk Import CSV
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setYoutubeModalOpen(true)}
+            leftIcon={<Video className="w-3.5 h-3.5 text-white" />}
+            className="bg-red-600 hover:bg-red-700 text-white shadow-xs"
+          >
+            Add YouTube Lecture
           </Button>
           <Button
             size="sm"
@@ -276,6 +287,16 @@ export const AdminResourcesPage: React.FC = () => {
       </Card>
 
       {/* Modals */}
+      <AddYouTubeLectureModal
+        isOpen={youtubeModalOpen}
+        onClose={() => setYoutubeModalOpen(false)}
+        subjects={subjects}
+        onAddLecture={async (data) => {
+          await createResource.mutateAsync(data as any);
+        }}
+        isLoading={createResource.isPending}
+      />
+
       <ResourceFormModal
         isOpen={resourceModalOpen}
         onClose={() => setResourceModalOpen(false)}

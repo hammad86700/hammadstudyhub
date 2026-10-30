@@ -5,14 +5,17 @@
 import React, { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useResource, useResources } from '../hooks/useResources';
+import { useAuth } from '../context/AuthContext';
 import { ResourceViewer } from '../components/resource/ResourceViewer';
 import { ResourceCard } from '../components/resource/ResourceCard';
 import { SEOHead } from '../components/common/SEOHead';
 import { EmptyState } from '../components/common/EmptyState';
 import { addRecentlyViewed } from '../lib/storage';
+import { StudyMaterialAuthGate } from '../components/common/StudyMaterialAuthGate';
 
 export const ResourceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { isLoggedIn } = useAuth();
   const { data: resource, isLoading } = useResource(id || '');
 
   // Fetch related resources in same subject
@@ -56,6 +59,33 @@ export const ResourceDetailPage: React.FC = () => {
           description="The study resource you requested does not exist or may have been unlisted."
           actionLabel="Return to Subjects"
           onAction={() => window.history.back()}
+        />
+      </div>
+    );
+  }
+
+  // Study Material Protection Gate for Guests
+  if (!isLoggedIn) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+        <SEOHead
+          title={`${resource.title} — Sign In Required`}
+          description="Please sign in or create an account to view and download study materials."
+        />
+        <div className="p-4 bg-white dark:bg-navy-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            Viewing: <strong className="text-slate-900 dark:text-white">{resource.title}</strong>
+          </div>
+          {resource.subject && (
+            <span className="font-semibold text-brand-600 dark:text-brand-400">
+              {resource.subject.name}
+            </span>
+          )}
+        </div>
+
+        <StudyMaterialAuthGate
+          title={`Sign In to Access "${resource.title}"`}
+          description="To view full embedded lecture videos, download notes, PDFs, and model solutions, please sign in to your Hammad StudyHub student account."
         />
       </div>
     );
