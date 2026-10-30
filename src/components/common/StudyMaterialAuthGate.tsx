@@ -148,3 +148,4 @@ export const StudyMaterialAuthGate: React.FC<StudyMaterialAuthGateProps> = ({
     </div>
   );
 };
+

@@ -292,3 +292,4 @@ export const AddYouTubeLectureModal: React.FC<AddYouTubeLectureModalProps> = ({
     </Modal>
   );
 };
+
