@@ -271,3 +271,4 @@ export const StudentSignupPage: React.FC = () => {
     </div>
   );
 };
+

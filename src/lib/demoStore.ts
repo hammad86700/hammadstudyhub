@@ -13,6 +13,7 @@ import {
   StudentRegistrationInput,
   PlatformSocials,
   ChatMessage,
+  SharedMaterialAttachment,
   UserRole,
 } from '../types';
 import {
@@ -291,6 +292,7 @@ export function sendChatMessage(data: {
   receiver_name: string;
   receiver_role: UserRole;
   message: string;
+  attachment?: SharedMaterialAttachment;
 }): ChatMessage {
   const all = getAllChatMessages();
   const newMsg: ChatMessage = {
@@ -303,6 +305,7 @@ export function sendChatMessage(data: {
     receiver_name: data.receiver_name,
     receiver_role: data.receiver_role,
     message: data.message.trim(),
+    attachment: data.attachment,
     created_at: new Date().toISOString(),
     read: false,
   };
@@ -311,6 +314,76 @@ export function sendChatMessage(data: {
   setStored(CHATS_KEY, all);
   window.dispatchEvent(new Event('studyhub_chat_updated'));
   return newMsg;
+}
+
+export function getSharedMaterialsBetween(userId1: string, userId2: string): SharedMaterialAttachment[] {
+  const msgs = getConversationMessages(userId1, userId2);
+  const attachments: SharedMaterialAttachment[] = [];
+  msgs.forEach((m) => {
+    if (m.attachment) {
+      attachments.push(m.attachment);
+    }
+  });
+  return attachments;
+}
+
+export function publishSharedMaterialToHub(
+  attachment: SharedMaterialAttachment,
+  publishedBy: string
+): Resource {
+  const subjects = getDemoSubjects();
+  // Find matching subject or pick first or create default
+  let subject = subjects.find(
+    (s) =>
+      s.id === attachment.subject_id ||
+      (attachment.subject_name && s.name.toLowerCase() === attachment.subject_name.toLowerCase())
+  );
+
+  if (!subject) {
+    if (subjects.length > 0) {
+      subject = subjects[0];
+    } else {
+      subject = {
+        id: `subj_${Date.now()}`,
+        name: attachment.subject_name || 'General Coursework',
+        slug: (attachment.subject_name || 'general-coursework').toLowerCase().replace(/\s+/g, '-'),
+        code: 'GEN101',
+        description: 'Collaborative Class Subject',
+        icon: 'BookOpen',
+        color: 'blue',
+        is_featured: true,
+        is_active: true,
+        sort_order: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      saveDemoSubject(subject);
+    }
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const newResource: Resource = {
+    id: `res_shared_${Date.now()}`,
+    subject_id: subject.id,
+    title: attachment.title,
+    slug: attachment.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+    description: attachment.description || `Shared by ${publishedBy} via class representative exchange`,
+    resource_type: attachment.resource_type,
+    lesson_date: todayStr,
+    source_provider: attachment.source_provider || (attachment.file_url.includes('youtube') ? 'youtube' : 'google_drive'),
+    external_url: attachment.file_url,
+    status: 'published',
+    tags: ['Class Representative', 'Shared Material', subject.name],
+    published_at: new Date().toISOString(),
+    created_by: publishedBy,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    subject,
+  };
+
+  saveDemoResource(newResource);
+  window.dispatchEvent(new Event('studyhub_resources_updated'));
+  return newResource;
 }
 
 // -----------------------------------------------------------------------------

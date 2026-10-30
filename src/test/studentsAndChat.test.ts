@@ -12,6 +12,9 @@ import {
   savePlatformSocials,
   sendChatMessage,
   getConversationMessages,
+  getSharedMaterialsBetween,
+  publishSharedMaterialToHub,
+  getDemoResources,
   clearAllStoredData,
 } from '../lib/demoStore';
 
@@ -146,4 +149,65 @@ describe('In-Platform Messaging & Gender-Aware Rules', () => {
     const reverseThread = getConversationMessages('cr-1', 'student-1');
     expect(reverseThread.length).toBe(1);
   });
+
+  it('allows CR and GR to chat with each other and share study materials', () => {
+    const crId = 'user-cr-101';
+    const grId = 'user-gr-202';
+
+    // 1. CR sends message to GR
+    const crMsg = sendChatMessage({
+      sender_id: crId,
+      sender_name: 'Bilal (CR)',
+      sender_role: 'cr',
+      sender_gender: 'male',
+      receiver_id: grId,
+      receiver_name: 'Fatima (GR)',
+      receiver_role: 'gr',
+      message: 'Hello GR, did you collect the English assignment questions?',
+    });
+    expect(crMsg.id).toBeDefined();
+
+    // 2. GR replies to CR and shares a PDF study material
+    const grMsg = sendChatMessage({
+      sender_id: grId,
+      sender_name: 'Fatima (GR)',
+      sender_role: 'gr',
+      sender_gender: 'female',
+      receiver_id: crId,
+      receiver_name: 'Bilal (CR)',
+      receiver_role: 'cr',
+      message: 'Yes! Here is the complete PDF worksheet for English grammar.',
+      attachment: {
+        id: 'mat_eng_1',
+        title: 'English Midterm Practice Worksheet',
+        subject_name: 'Functional English',
+        resource_type: 'pdf',
+        file_url: 'https://drive.google.com/file/d/english-practice-pdf',
+        description: 'Complete solved grammar worksheet for class preparation',
+        created_at: new Date().toISOString(),
+      },
+    });
+    expect(grMsg.attachment).toBeDefined();
+    expect(grMsg.attachment?.title).toBe('English Midterm Practice Worksheet');
+
+    // 3. Conversation contains both messages
+    const thread = getConversationMessages(crId, grId);
+    expect(thread.length).toBe(2);
+
+    // 4. Verify Shared Materials between CR and GR
+    const shared = getSharedMaterialsBetween(crId, grId);
+    expect(shared.length).toBe(1);
+    expect(shared[0].title).toBe('English Midterm Practice Worksheet');
+    expect(shared[0].file_url).toContain('google.com');
+
+    // 5. CR can publish the shared material directly to Hammad StudyHub library
+    const publishedResource = publishSharedMaterialToHub(shared[0], 'Bilal (CR)');
+    expect(publishedResource.id).toBeDefined();
+    expect(publishedResource.title).toBe('English Midterm Practice Worksheet');
+    expect(publishedResource.status).toBe('published');
+
+    const libraryResources = getDemoResources();
+    expect(libraryResources.some((r) => r.id === publishedResource.id)).toBe(true);
+  });
 });
+

@@ -54,6 +54,20 @@ export interface PlatformSocials {
   instagram_url?: string;
 }
 
+export interface SharedMaterialAttachment {
+  id: string;
+  title: string;
+  subject_name?: string;
+  subject_id?: string;
+  resource_type: ResourceType;
+  file_url: string;
+  description?: string;
+  source_provider?: SourceProvider;
+  is_hub_resource?: boolean;
+  hub_resource_id?: string;
+  created_at: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender_id: string;
@@ -64,6 +78,7 @@ export interface ChatMessage {
   receiver_name: string;
   receiver_role: UserRole;
   message: string;
+  attachment?: SharedMaterialAttachment;
   created_at: string;
   read?: boolean;
 }
