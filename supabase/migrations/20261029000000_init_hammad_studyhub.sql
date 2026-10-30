@@ -15,9 +15,30 @@ create extension if not exists "pg_trgm";
 create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   display_name text not null,
-  role text not null default 'student' check (role in ('admin', 'student')),
+  role text not null default 'student' check (role in ('admin', 'cr', 'gr', 'student')),
+  gender text check (gender in ('male', 'female')),
+  phone text,
+  roll_no text,
+  program_name text,
+  semester text,
   created_at timestamptz default timezone('utc', now()) not null,
   updated_at timestamptz default timezone('utc', now()) not null
+);
+
+-- 2.1.1 In-Platform Messages & Study Material Attachments
+create table if not exists public.chat_messages (
+  id text primary key,
+  sender_id text not null,
+  sender_name text not null,
+  sender_role text not null,
+  sender_gender text,
+  receiver_id text not null,
+  receiver_name text not null,
+  receiver_role text not null,
+  message text not null,
+  attachment jsonb,
+  created_at timestamptz default timezone('utc', now()) not null,
+  read boolean default false
 );
 
 -- 2.2 Institutions (Supports multi-institution expansion)
@@ -199,6 +220,24 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- 4.2.1 Study Manager Check Helper (Admin, CR, GR)
+create or replace function public.is_study_manager()
+returns boolean as $$
+declare
+  current_role text;
+begin
+  if auth.uid() is null then
+    return false;
+  end if;
+  
+  select role into current_role
+  from public.profiles
+  where id = auth.uid();
+  
+  return coalesce(current_role in ('admin', 'cr', 'gr'), false);
+end;
+$$ language plpgsql security definer;
+
 -- 4.3 Automatically create profile entry on user signup
 create or replace function public.handle_new_user()
 returns trigger as $$
@@ -230,6 +269,7 @@ alter table public.resources enable row level security;
 alter table public.announcements enable row level security;
 alter table public.feedback enable row level security;
 alter table public.platform_settings enable row level security;
+alter table public.chat_messages enable row level security;
 
 -- 5.1 Profiles Policies
 create policy "Users can view their own profile or Admins view all"
@@ -304,15 +344,19 @@ create policy "Admins can insert subjects" on public.subjects for insert with ch
 create policy "Admins can update subjects" on public.subjects for update using (public.is_admin());
 create policy "Admins can delete subjects" on public.subjects for delete using (public.is_admin());
 
--- Resources
-create policy "Admins can insert resources" on public.resources for insert with check (public.is_admin());
-create policy "Admins can update resources" on public.resources for update using (public.is_admin());
-create policy "Admins can delete resources" on public.resources for delete using (public.is_admin());
+-- Resources (Admins, CR, and GR can insert, update, and manage resources)
+create policy "Managers can insert resources" on public.resources for insert with check (public.is_study_manager());
+create policy "Managers can update resources" on public.resources for update using (public.is_study_manager());
+create policy "Managers can delete resources" on public.resources for delete using (public.is_study_manager());
 
 -- Announcements
-create policy "Admins can insert announcements" on public.announcements for insert with check (public.is_admin());
-create policy "Admins can update announcements" on public.announcements for update using (public.is_admin());
-create policy "Admins can delete announcements" on public.announcements for delete using (public.is_admin());
+create policy "Managers can insert announcements" on public.announcements for insert with check (public.is_study_manager());
+create policy "Managers can update announcements" on public.announcements for update using (public.is_study_manager());
+create policy "Managers can delete announcements" on public.announcements for delete using (public.is_study_manager());
 
--- Platform Settings
+-- In-Platform Chat Messages
+create policy "Users can view chat messages" on public.chat_messages for select using (true);
+create policy "Users can insert chat messages" on public.chat_messages for insert with check (true);
+
+-- Platform Settings (Master Admin only)
 create policy "Admins can manage platform settings" on public.platform_settings for all using (public.is_admin());
