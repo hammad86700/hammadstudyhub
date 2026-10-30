@@ -45,3 +45,4 @@ describe('PWA Manifest & Configuration', () => {
     expect(swContent).toContain('/admin'); // checks admin exemption
   });
 });
+

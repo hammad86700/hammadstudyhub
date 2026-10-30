@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { Settings, Shield, Database, Save, RotateCcw, CheckCircle, Info, Key } from 'lucide-react';
 import { isSupabaseConfigured } from '../../lib/supabase';
-import { resetDemoData } from '../../lib/demoStore';
+import { clearAllStoredData } from '../../lib/demoStore';
 import { SEOHead } from '../../components/common/SEOHead';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -153,23 +153,23 @@ export const AdminSettingsPage: React.FC = () => {
         </form>
       </Card>
 
-      {/* Reset Demo Data Action */}
+      {/* Clear Stored Data Action */}
       <Card className="p-6 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-            Reset Sample Demo Content
+            Clear Stored Content
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Re-initializes all sample subjects, lessons, whiteboard notes, and announcements to their initial state.
+            Wipes all local subjects, resources, and notices from storage to reset to a clean slate.
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          onClick={resetDemoData}
-          leftIcon={<RotateCcw className="w-3.5 h-3.5 text-amber-500" />}
+          onClick={clearAllStoredData}
+          leftIcon={<RotateCcw className="w-3.5 h-3.5 text-red-500" />}
         >
-          Reset Sample Data
+          Clear Stored Content
         </Button>
       </Card>
     </div>

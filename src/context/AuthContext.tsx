@@ -1,6 +1,6 @@
 // ==============================================================================
 // HAMMAD STUDYHUB — AUTHENTICATION CONTEXT
-// Supabase Auth Integration with safe local fallback for zero-config demonstration
+// Configured for administrator account: admin123@gmail.com
 // ==============================================================================
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -17,18 +17,17 @@ interface AuthContextType {
   isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
-  // For demo testing only
   signInAsDemoAdmin: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const DEMO_ADMIN_PROFILE: UserProfile = {
-  id: 'demo-admin-id',
+const ADMIN_PROFILE: UserProfile = {
+  id: 'admin-hammad-id',
   display_name: 'Muhammad Hammad (Admin)',
   role: 'admin',
-  created_at: '2026-09-01T00:00:00Z',
-  updated_at: '2026-09-01T00:00:00Z',
+  created_at: '2026-10-30T00:00:00Z',
+  updated_at: '2026-10-30T00:00:00Z',
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -37,10 +36,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if saved demo admin session exists
-  const [isDemoAdminLoggedIn, setIsDemoAdminLoggedIn] = useState<boolean>(() => {
+  // Check if saved admin session exists in local storage
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('studyhub_demo_admin_auth') === 'true';
+      return localStorage.getItem('studyhub_admin_auth') === 'true';
     } catch {
       return false;
     }
@@ -77,21 +76,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         subscription.unsubscribe();
       };
     } else {
-      // 2. Demo Mode
-      if (isDemoAdminLoggedIn) {
+      // 2. Local Mode with admin123@gmail.com
+      if (isAdminLoggedIn) {
         setUser({
-          id: DEMO_ADMIN_PROFILE.id,
-          email: 'admin@hammadstudyhub.com',
+          id: ADMIN_PROFILE.id,
+          email: 'admin123@gmail.com',
           app_metadata: {},
-          user_metadata: { display_name: DEMO_ADMIN_PROFILE.display_name },
+          user_metadata: { display_name: ADMIN_PROFILE.display_name },
           aud: 'authenticated',
-          created_at: DEMO_ADMIN_PROFILE.created_at,
+          created_at: ADMIN_PROFILE.created_at,
         } as User);
-        setProfile(DEMO_ADMIN_PROFILE);
+        setProfile(ADMIN_PROFILE);
       }
       setIsLoading(false);
     }
-  }, [isDemoAdminLoggedIn]);
+  }, [isAdminLoggedIn]);
 
   async function fetchUserProfile(userId: string) {
     try {
@@ -103,11 +102,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.warn('Error fetching user profile:', error.message);
-        // Fallback profile if record hasn't synced yet
         setProfile({
           id: userId,
           display_name: 'Administrator',
-          role: 'student', // Security default: not admin until verified
+          role: 'student',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
@@ -136,7 +134,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (data.user) {
-          // Verify role from profiles
           const { data: profileData } = await supabase
             .from('profiles')
             .select('role')
@@ -155,20 +152,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
         return {};
       } else {
-        // Safe Demo Mode authentication simulation
+        // Authenticate admin account: admin123@gmail.com / admin@123
         if (
-          (email.trim().toLowerCase() === 'admin@hammadstudyhub.com' && password === 'admin123') ||
-          (email.trim().toLowerCase() === 'hammad@studyhub.com' && password === 'admin123')
+          email.trim().toLowerCase() === 'admin123@gmail.com' &&
+          password === 'admin@123'
         ) {
-          signInAsDemoAdmin();
+          setIsAdminLoggedIn(true);
+          localStorage.setItem('studyhub_admin_auth', 'true');
+          setUser({
+            id: ADMIN_PROFILE.id,
+            email: 'admin123@gmail.com',
+            app_metadata: {},
+            user_metadata: { display_name: ADMIN_PROFILE.display_name },
+            aud: 'authenticated',
+            created_at: ADMIN_PROFILE.created_at,
+          } as User);
+          setProfile(ADMIN_PROFILE);
           setIsLoading(false);
           return {};
         }
 
         setIsLoading(false);
         return {
-          error:
-            'Invalid credentials in Demo Mode. Try: admin@hammadstudyhub.com / admin123 (or connect Supabase in .env)',
+          error: 'Invalid credentials. Administrator email: admin123@gmail.com',
         };
       }
     } catch (e: any) {
@@ -178,27 +184,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInAsDemoAdmin = () => {
-    setIsDemoAdminLoggedIn(true);
-    localStorage.setItem('studyhub_demo_admin_auth', 'true');
+    setIsAdminLoggedIn(true);
+    localStorage.setItem('studyhub_admin_auth', 'true');
     setUser({
-      id: DEMO_ADMIN_PROFILE.id,
-      email: 'admin@hammadstudyhub.com',
+      id: ADMIN_PROFILE.id,
+      email: 'admin123@gmail.com',
       app_metadata: {},
-      user_metadata: { display_name: DEMO_ADMIN_PROFILE.display_name },
+      user_metadata: { display_name: ADMIN_PROFILE.display_name },
       aud: 'authenticated',
-      created_at: DEMO_ADMIN_PROFILE.created_at,
+      created_at: ADMIN_PROFILE.created_at,
     } as User);
-    setProfile(DEMO_ADMIN_PROFILE);
+    setProfile(ADMIN_PROFILE);
   };
 
   const signOut = async (): Promise<void> => {
     setIsLoading(true);
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
-    } else {
-      setIsDemoAdminLoggedIn(false);
-      localStorage.removeItem('studyhub_demo_admin_auth');
     }
+    setIsAdminLoggedIn(false);
+    try {
+      localStorage.removeItem('studyhub_admin_auth');
+      localStorage.removeItem('studyhub_demo_admin_auth');
+    } catch {}
     setUser(null);
     setSession(null);
     setProfile(null);
@@ -226,10 +234,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export function useAuth(): AuthContextType {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};

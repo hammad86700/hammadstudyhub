@@ -1,10 +1,11 @@
 // ==============================================================================
 // HAMMAD STUDYHUB — ADMINISTRATOR LOGIN
+// Configured for administrator account: admin123@gmail.com
 // ==============================================================================
 
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle, Sparkles, Database } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle, KeyRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { SEOHead } from '../../components/common/SEOHead';
 import { Card } from '../../components/common/Card';
@@ -17,7 +18,7 @@ export const AdminLoginPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { signIn, signInAsDemoAdmin, isDemoMode, isAdmin } = useAuth();
+  const { signIn, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -45,11 +46,6 @@ export const AdminLoginPage: React.FC = () => {
     }
   };
 
-  const handleDemoLogin = () => {
-    signInAsDemoAdmin();
-    navigate('/admin', { replace: true });
-  };
-
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">
       <SEOHead title="Administrator Login" />
@@ -67,32 +63,6 @@ export const AdminLoginPage: React.FC = () => {
             Hammad StudyHub &bull; Platform Management & Content Controls
           </p>
         </div>
-
-        {/* Demo Mode Notice & Quick Access */}
-        {isDemoMode && (
-          <aside
-            aria-label="Demo administrator access"
-            className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 space-y-2"
-          >
-            <div className="flex items-center gap-1.5 font-bold">
-              <Database className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span>Demo Mode Active (Zero Configuration)</span>
-            </div>
-            <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-              Cloud Supabase keys have not been configured yet. You can test all administrator features immediately using the Demo Administrator mode:
-            </p>
-            <Button
-              type="button"
-              variant="accent"
-              size="sm"
-              className="w-full text-xs font-semibold py-1.5"
-              onClick={handleDemoLogin}
-              leftIcon={<Sparkles className="w-3.5 h-3.5" />}
-            >
-              Sign In as Demo Admin (1-Click)
-            </Button>
-          </aside>
-        )}
 
         {/* Form Card */}
         <Card className="p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-card">
@@ -112,7 +82,7 @@ export const AdminLoginPage: React.FC = () => {
               leftIcon={<Mail className="w-4 h-4" />}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={isDemoMode ? 'admin@hammadstudyhub.com' : 'admin@example.com'}
+              placeholder="admin123@gmail.com"
             />
 
             <Input

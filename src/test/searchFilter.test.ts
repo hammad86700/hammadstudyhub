@@ -125,3 +125,4 @@ describe('Search and Filter Logic', () => {
     expect(chapter2[0].title).toContain('Loops');
   });
 });
+

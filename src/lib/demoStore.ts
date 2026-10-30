@@ -1,6 +1,6 @@
 // ==============================================================================
-// HAMMAD STUDYHUB — DEMO STORE (LOCAL PERSISTENCE ADAPTER)
-// Powers full CRUD capability in Demo Mode without requiring cloud credentials
+// HAMMAD STUDYHUB — STORE (LOCAL PERSISTENCE ADAPTER)
+// Zero dummy data. Provides client-side persistence for administrator-created content.
 // ==============================================================================
 
 import { Subject, Resource, Announcement, FeedbackSubmission } from '../types';
@@ -10,10 +10,21 @@ import {
   INITIAL_DEMO_ANNOUNCEMENTS,
 } from './mockData';
 
-const DEMO_SUBJECTS_KEY = 'studyhub_demo_subjects_v1';
-const DEMO_RESOURCES_KEY = 'studyhub_demo_resources_v1';
-const DEMO_ANNOUNCEMENTS_KEY = 'studyhub_demo_announcements_v1';
-const DEMO_FEEDBACK_KEY = 'studyhub_demo_feedback_v1';
+const SUBJECTS_KEY = 'studyhub_subjects_clean';
+const RESOURCES_KEY = 'studyhub_resources_clean';
+const ANNOUNCEMENTS_KEY = 'studyhub_announcements_clean';
+const FEEDBACK_KEY = 'studyhub_feedback_clean';
+
+// Automatically clean up any legacy dummy data from previous sessions
+try {
+  localStorage.removeItem('studyhub_demo_subjects_v1');
+  localStorage.removeItem('studyhub_demo_resources_v1');
+  localStorage.removeItem('studyhub_demo_announcements_v1');
+  localStorage.removeItem('studyhub_demo_feedback_v1');
+  localStorage.removeItem('studyhub_demo_admin_auth');
+} catch {
+  // Ignore in environments without window/localStorage
+}
 
 function getStoredOrInit<T>(key: string, initial: T[]): T[] {
   try {
@@ -32,7 +43,7 @@ function setStored<T>(key: string, data: T[]): void {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
-    console.warn('Local demo store save error:', e);
+    console.warn('Local store save error:', e);
   }
 }
 
@@ -40,7 +51,7 @@ function setStored<T>(key: string, data: T[]): void {
 // SUBJECTS
 // -----------------------------------------------------------------------------
 export function getDemoSubjects(): Subject[] {
-  return getStoredOrInit<Subject>(DEMO_SUBJECTS_KEY, INITIAL_DEMO_SUBJECTS);
+  return getStoredOrInit<Subject>(SUBJECTS_KEY, INITIAL_DEMO_SUBJECTS);
 }
 
 export function saveDemoSubject(subject: Subject): Subject {
@@ -53,20 +64,20 @@ export function saveDemoSubject(subject: Subject): Subject {
   } else {
     updated = [{ ...subject, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...list];
   }
-  setStored(DEMO_SUBJECTS_KEY, updated);
+  setStored(SUBJECTS_KEY, updated);
   return subject;
 }
 
 export function deleteDemoSubject(id: string): void {
   const list = getDemoSubjects();
-  setStored(DEMO_SUBJECTS_KEY, list.filter((s) => s.id !== id));
+  setStored(SUBJECTS_KEY, list.filter((s) => s.id !== id));
 }
 
 // -----------------------------------------------------------------------------
 // RESOURCES
 // -----------------------------------------------------------------------------
 export function getDemoResources(): Resource[] {
-  return getStoredOrInit<Resource>(DEMO_RESOURCES_KEY, INITIAL_DEMO_RESOURCES);
+  return getStoredOrInit<Resource>(RESOURCES_KEY, INITIAL_DEMO_RESOURCES);
 }
 
 export function saveDemoResource(resource: Resource): Resource {
@@ -79,28 +90,32 @@ export function saveDemoResource(resource: Resource): Resource {
   } else {
     updated = [{ ...resource, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...list];
   }
-  setStored(DEMO_RESOURCES_KEY, updated);
+  setStored(RESOURCES_KEY, updated);
   return resource;
 }
 
 export function deleteDemoResource(id: string): void {
   const list = getDemoResources();
-  setStored(DEMO_RESOURCES_KEY, list.filter((r) => r.id !== id));
+  setStored(RESOURCES_KEY, list.filter((r) => r.id !== id));
+}
+
+export function clearAllStoredData(): void {
+  localStorage.setItem(SUBJECTS_KEY, JSON.stringify([]));
+  localStorage.setItem(RESOURCES_KEY, JSON.stringify([]));
+  localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify([]));
+  localStorage.setItem(FEEDBACK_KEY, JSON.stringify([]));
+  window.location.reload();
 }
 
 export function resetDemoData(): void {
-  localStorage.setItem(DEMO_SUBJECTS_KEY, JSON.stringify(INITIAL_DEMO_SUBJECTS));
-  localStorage.setItem(DEMO_RESOURCES_KEY, JSON.stringify(INITIAL_DEMO_RESOURCES));
-  localStorage.setItem(DEMO_ANNOUNCEMENTS_KEY, JSON.stringify(INITIAL_DEMO_ANNOUNCEMENTS));
-  localStorage.setItem(DEMO_FEEDBACK_KEY, JSON.stringify([]));
-  window.location.reload();
+  clearAllStoredData();
 }
 
 // -----------------------------------------------------------------------------
 // ANNOUNCEMENTS
 // -----------------------------------------------------------------------------
 export function getDemoAnnouncements(): Announcement[] {
-  return getStoredOrInit<Announcement>(DEMO_ANNOUNCEMENTS_KEY, INITIAL_DEMO_ANNOUNCEMENTS);
+  return getStoredOrInit<Announcement>(ANNOUNCEMENTS_KEY, INITIAL_DEMO_ANNOUNCEMENTS);
 }
 
 export function saveDemoAnnouncement(announcement: Announcement): Announcement {
@@ -113,29 +128,29 @@ export function saveDemoAnnouncement(announcement: Announcement): Announcement {
   } else {
     updated = [announcement, ...list];
   }
-  setStored(DEMO_ANNOUNCEMENTS_KEY, updated);
+  setStored(ANNOUNCEMENTS_KEY, updated);
   return announcement;
 }
 
 export function deleteDemoAnnouncement(id: string): void {
   const list = getDemoAnnouncements();
-  setStored(DEMO_ANNOUNCEMENTS_KEY, list.filter((a) => a.id !== id));
+  setStored(ANNOUNCEMENTS_KEY, list.filter((a) => a.id !== id));
 }
 
 // -----------------------------------------------------------------------------
 // FEEDBACK
 // -----------------------------------------------------------------------------
 export function submitDemoFeedback(feedback: FeedbackSubmission): void {
-  const list = getStoredOrInit<FeedbackSubmission>(DEMO_FEEDBACK_KEY, []);
+  const list = getStoredOrInit<FeedbackSubmission>(FEEDBACK_KEY, []);
   list.unshift({
     ...feedback,
     id: `fb_${Date.now()}`,
     status: 'pending',
     created_at: new Date().toISOString(),
   });
-  setStored(DEMO_FEEDBACK_KEY, list);
+  setStored(FEEDBACK_KEY, list);
 }
 
 export function getDemoFeedback(): FeedbackSubmission[] {
-  return getStoredOrInit<FeedbackSubmission>(DEMO_FEEDBACK_KEY, []);
+  return getStoredOrInit<FeedbackSubmission>(FEEDBACK_KEY, []);
 }

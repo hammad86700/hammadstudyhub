@@ -18,11 +18,9 @@ import {
   Moon,
   ShieldCheck,
   Database,
-  RotateCcw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { resetDemoData } from '../../lib/demoStore';
 import { Button } from '../common/Button';
 
 export const AdminLayout: React.FC = () => {
@@ -90,23 +88,16 @@ export const AdminLayout: React.FC = () => {
           </button>
         </div>
 
-        {/* Demo Mode Badge */}
+        {/* Storage Mode Badge */}
         {isDemoMode && (
-          <div className="m-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex flex-col gap-1.5">
-            <div className="flex items-center gap-1.5 font-semibold text-[11px]">
-              <Database className="w-3.5 h-3.5 text-amber-400" />
-              <span>Demo Storage Mode</span>
+          <div className="m-3 p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-xs flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5 font-semibold text-[11px] text-brand-400">
+              <Database className="w-3.5 h-3.5" />
+              <span>Local Storage Active</span>
             </div>
-            <p className="text-[10px] text-amber-200/80 leading-tight">
-              Changes persist in local browser storage. Connect Supabase in .env for production.
+            <p className="text-[10px] text-slate-400 leading-tight">
+              Published materials save directly in local storage. Connect Supabase in .env for multi-device sync.
             </p>
-            <button
-              onClick={resetDemoData}
-              className="mt-1 text-[10px] font-semibold text-amber-400 hover:underline flex items-center gap-1"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Reset Sample Data</span>
-            </button>
           </div>
         )}
 
