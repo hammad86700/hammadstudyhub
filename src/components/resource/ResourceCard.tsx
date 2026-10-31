@@ -3,7 +3,7 @@
 // ==============================================================================
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   FileText,
   Video,
@@ -16,10 +16,12 @@ import {
   ExternalLink,
   CheckCircle,
   Tag,
+  Lock,
 } from 'lucide-react';
 import { Resource } from '../../types';
 import { formatLessonDate, getResourceTypeMeta } from '../../lib/utils';
 import { isBookmarked, addBookmark, removeBookmark, isChecklistCompleted, toggleChecklistItem } from '../../lib/storage';
+import { useAuth } from '../../context/AuthContext';
 import { Card } from '../common/Card';
 
 interface ResourceCardProps {
@@ -31,6 +33,8 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
   resource,
   showSubjectBadge = false,
 }) => {
+  const navigate = useNavigate();
+  const { isLoggedIn } = useAuth();
   const [bookmarked, setBookmarked] = useState(() => isBookmarked(resource.id));
   const [completed, setCompleted] = useState(() => isChecklistCompleted(resource.id));
 
@@ -58,6 +62,10 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
   const handleBookmarkToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isLoggedIn) {
+      navigate('/signup');
+      return;
+    }
     if (bookmarked) {
       removeBookmark(resource.id);
       setBookmarked(false);
@@ -77,6 +85,10 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
   const handleChecklistToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isLoggedIn) {
+      navigate('/signup');
+      return;
+    }
     const isNow = toggleChecklistItem(
       resource.id,
       resource.subject?.slug || 'general',
@@ -90,6 +102,11 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
 
   const handleDirectClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isLoggedIn) {
+      e.preventDefault();
+      navigate('/signup');
+      return;
+    }
     if (directUrl.startsWith('data:')) {
       e.preventDefault();
       try {
@@ -107,6 +124,8 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
       } catch {
         window.open(directUrl, '_blank');
       }
+    } else if (directUrl) {
+      window.open(directUrl, '_blank');
     }
   };
 
@@ -184,15 +203,19 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
           <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
             {directUrl ? (
               <a
-                href={directUrl}
-                target="_blank"
+                href={isLoggedIn ? directUrl : '/signup'}
+                target={isLoggedIn ? '_blank' : '_self'}
                 rel="noopener noreferrer"
                 onClick={handleDirectClick}
                 className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none inline-flex items-center gap-1.5 group cursor-pointer"
-                title="Directly open study material in new tab"
+                title={isLoggedIn ? 'Directly open study material in new tab' : 'Sign up to access this study material'}
               >
                 <span>{resource.title}</span>
-                <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
+                {isLoggedIn ? (
+                  <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
+                ) : (
+                  <Lock className="w-3.5 h-3.5 text-brand-500 shrink-0" />
+                )}
               </a>
             ) : (
               <Link
@@ -250,18 +273,6 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {resource.google_drive_folder_url && (
-            <a
-              href={resource.google_drive_folder_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-emerald-700 dark:text-emerald-300 hover:underline text-xs font-semibold flex items-center gap-1"
-              title="Open Course Google Drive Folder"
-            >
-              <span>📁 Drive</span>
-            </a>
-          )}
-
           <Link
             to={`/resources/${resource.slug || resource.id}`}
             className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-medium"
@@ -270,17 +281,19 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
           </Link>
 
           {directUrl && (
-            <a
-              href={directUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
               onClick={handleDirectClick}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 transition-colors shadow-xs cursor-pointer"
-              title="Directly open PDF / Material in new tab"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer ${
+                isLoggedIn
+                  ? 'text-white bg-brand-600 hover:bg-brand-700'
+                  : 'text-brand-700 dark:text-brand-300 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800'
+              }`}
+              title={isLoggedIn ? 'Directly open PDF / Material in new tab' : 'Sign up or log in to view this study material'}
             >
-              <span>{getActionLabel()}</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+              <span>{isLoggedIn ? getActionLabel() : 'Sign In to Access'}</span>
+              {isLoggedIn ? <ExternalLink className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+            </button>
           )}
         </div>
       </div>

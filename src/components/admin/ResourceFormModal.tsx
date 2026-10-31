@@ -1,16 +1,15 @@
 // ==============================================================================
-// HAMMAD STUDYHUB — RESOURCE FORM MODAL (MULTI-FILE & GOOGLE DRIVE AUTOMATION)
+// HAMMAD STUDYHUB — RESOURCE FORM MODAL (SYSTEM CLOUD BACKUP STORAGE)
 // Architect: Muhammad Hammad
 //
 // Key Features:
-// 1. Automatic Subject Folder Routing: Selecting a subject instantly links to its
-//    registered Google Drive folder. No repeated pasting of folder links!
+// 1. Direct System Backup Storage: Files upload directly into StudyHub's secure
+//    platform storage (Supabase + local storage fallback) with zero external Drive errors.
 // 2. Multi-File Selection & Drag-and-Drop for academic materials:
 //    PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, JPG, JPEG, PNG, ZIP.
-// 3. Direct Google Drive API Integration: Uploads files directly into the subject's
-//    Google Drive folder ID via secure serverless endpoint or client OAuth.
+// 3. Instant Protected Access: All signed-in students can view and download materials directly.
 // 4. Individual File Progress, Status Reporting, and Retry Options.
-// 5. Zero Fake Uploads: Full metadata synchronization into Supabase.
+// 5. Zero Configuration Roadblocks: No Google Cloud quotas or Service Account dependencies.
 // ==============================================================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -23,36 +22,21 @@ import {
   ExternalLink,
   Calendar,
   Link as LinkIcon,
-  FolderCheck,
   Upload,
   FileText,
-  FileSpreadsheet,
   Presentation,
-  Video,
   Archive,
   Image as ImageIcon,
   Sparkles,
   X,
   RefreshCw,
-  Key,
-  ShieldAlert,
+  ShieldCheck,
   Check,
-  FileCheck,
-  Copy,
+  HardDrive,
 } from 'lucide-react';
-import { Resource, ResourceType, Subject } from '../../types';
-import { parseGoogleDriveUrl, parseYouTubeUrl, detectSourceProvider } from '../../lib/googleDrive';
-import {
-  uploadFileToDriveFolder,
-  requestGoogleDriveAuthorization,
-  isGoogleDriveClientConnected,
-  formatFileSize,
-  fileToBase64,
-  getGoogleDriveClientToken,
-  getDriveServerStatus,
-  DriveServerStatus,
-  DriveUploadResult,
-} from '../../lib/googleDriveApi';
+import { Resource, ResourceType, Subject, SourceProvider } from '../../types';
+import { parseYouTubeUrl, detectSourceProvider } from '../../lib/googleDrive';
+import { formatFileSize, fileToBase64 } from '../../lib/googleDriveApi';
 import { getTodayDateString, slugify } from '../../lib/utils';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -82,7 +66,6 @@ export interface UploadQueueItem {
   status: 'idle' | 'uploading' | 'success' | 'error';
   progress: number;
   error?: string;
-  driveResult?: DriveUploadResult;
 }
 
 interface ResourceFormModalProps {
@@ -137,24 +120,11 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
 }) => {
   const [fileQueue, setFileQueue] = useState<UploadQueueItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [isAuthorizingDrive, setIsAuthorizingDrive] = useState(false);
-  const [isGoogleConnected, setIsGoogleConnected] = useState(() => isGoogleDriveClientConnected());
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [isProcessingUploads, setIsProcessingUploads] = useState(false);
-  const [driveValidation, setDriveValidation] = useState<any>(null);
-  const [driveServerStatus, setDriveServerStatus] = useState<DriveServerStatus | null>(null);
-  const [copiedSaEmail, setCopiedSaEmail] = useState(false);
+  const [urlValidation, setUrlValidation] = useState<any>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Poll server Google Drive status when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      getDriveServerStatus().then((status) => {
-        setDriveServerStatus(status);
-      });
-    }
-  }, [isOpen]);
 
   const {
     register,
@@ -184,13 +154,6 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
 
   // Active Subject selection
   const currentSubject = subjects.find((s) => s.id === watchedSubjectId) || subjects[0];
-
-  // Keep Google Drive auth connection state synced
-  useEffect(() => {
-    const handleAuthChange = () => setIsGoogleConnected(isGoogleDriveClientConnected());
-    window.addEventListener('studyhub_gdrive_auth_changed', handleAuthChange);
-    return () => window.removeEventListener('studyhub_gdrive_auth_changed', handleAuthChange);
-  }, []);
 
   // Sync initialData when editing
   useEffect(() => {
@@ -229,17 +192,14 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
   // Live URL validation preview
   useEffect(() => {
     if (!watchedUrl) {
-      setDriveValidation(null);
+      setUrlValidation(null);
       return;
     }
 
     const provider = detectSourceProvider(watchedUrl);
-    if (provider === 'google_drive') {
-      const parsed = parseGoogleDriveUrl(watchedUrl);
-      setDriveValidation(parsed);
-    } else if (provider === 'youtube') {
+    if (provider === 'youtube') {
       const parsed = parseYouTubeUrl(watchedUrl);
-      setDriveValidation({
+      setUrlValidation({
         isValid: parsed.isValid,
         resourceKind: 'youtube_video',
         permissionNotice: 'Ensure YouTube video is set to Public or Unlisted.',
@@ -247,9 +207,9 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
         error: parsed.error,
       });
     } else {
-      setDriveValidation({
+      setUrlValidation({
         isValid: true,
-        resourceKind: 'direct_url',
+        resourceKind: 'external_link',
         permissionNotice: 'Direct link verified.',
       });
     }
@@ -319,226 +279,16 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       addFilesToQueue(e.target.files);
-      // Reset input value so same files can be re-selected if removed
       e.target.value = '';
     }
   };
 
-  // Google OAuth Authorization Trigger
-  const handleAuthorizeGoogleDrive = async () => {
-    setIsAuthorizingDrive(true);
-    setGlobalError(null);
-    try {
-      await requestGoogleDriveAuthorization();
-      setIsGoogleConnected(true);
-    } catch (authErr: any) {
-      setGlobalError(authErr?.message || 'Google Drive authorization was denied or cancelled.');
-    } finally {
-      setIsAuthorizingDrive(false);
-    }
-  };
-
-  const handlePromptClientId = () => {
-    const existing = localStorage.getItem('studyhub_custom_google_client_id') || '';
-    const input = window.prompt(
-      'Paste your Google OAuth Client ID from Google Cloud Console (e.g. xxxxx.apps.googleusercontent.com):',
-      existing
-    );
-    if (input && input.trim()) {
-      localStorage.setItem('studyhub_custom_google_client_id', input.trim());
-      setGlobalError(null);
-      handleAuthorizeGoogleDrive();
-    }
-  };
-
-  // Single Item Retry
-  const handleRetryItem = async (itemId: string, formData: ResourceFormData) => {
-    const item = fileQueue.find((i) => i.id === itemId);
-    if (!item) return;
-
-    if (!currentSubject?.google_drive_folder_id) {
-      setGlobalError('Selected subject does not have a Google Drive folder configured.');
-      return;
-    }
-
-    // Set item to uploading
-    setFileQueue((prev) =>
-      prev.map((i) => (i.id === itemId ? { ...i, status: 'uploading', progress: 10, error: undefined } : i))
-    );
-
-    try {
-      const driveResult = await uploadFileToDriveFolder({
-        file: item.file,
-        folderId: currentSubject.google_drive_folder_id,
-        onProgress: (pct) => {
-          setFileQueue((prev) =>
-            prev.map((i) => (i.id === itemId ? { ...i, progress: pct } : i))
-          );
-        },
-      });
-
-      // Save to Supabase
-      const tags = (formData.tags_string || '')
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean);
-
-      await onSubmit({
-        ...formData,
-        title: item.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
-        subject_id: currentSubject.id,
-        resource_type: item.inferredType || formData.resource_type,
-        external_url: driveResult.webViewLink,
-        embed_url: `https://drive.google.com/file/d/${driveResult.fileId}/preview`,
-        google_drive_file_id: driveResult.fileId,
-        google_drive_file_url: driveResult.webViewLink,
-        google_drive_folder_url: currentSubject.google_drive_folder_url,
-        file_name: item.name,
-        original_filename: item.name,
-        mime_type: driveResult.mimeType,
-        file_size: driveResult.fileSize,
-        source_provider: 'google_drive',
-        tags,
-        slug: slugify(item.name.replace(/\.[^/.]+$/, '')),
-      });
-
-      setFileQueue((prev) =>
-        prev.map((i) => (i.id === itemId ? { ...i, status: 'success', progress: 100, driveResult } : i))
-      );
-    } catch (err: any) {
-      setFileQueue((prev) =>
-        prev.map((i) => (i.id === itemId ? { ...i, status: 'error', error: err?.message || 'Upload failed.' } : i))
-      );
-    }
-  };
-
-  // Instant Direct Publish Fallback (Bypasses Google Personal Account 0-Quota Restrictions)
-  const handlePublishDirectlyItem = async (itemId: string, formData: ResourceFormData) => {
-    const item = fileQueue.find((i) => i.id === itemId);
-    if (!item) return;
-
-    setFileQueue((prev) =>
-      prev.map((i) => (i.id === itemId ? { ...i, status: 'uploading', progress: 50, error: undefined } : i))
-    );
-
-    try {
-      const base64Data = await fileToBase64(item.file);
-      const tags = (formData.tags_string || '')
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean);
-
-      const resourceTitle =
-        fileQueue.length === 1 && formData.title
-          ? formData.title
-          : item.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-
-      await onSubmit({
-        ...formData,
-        title: resourceTitle,
-        subject_id: currentSubject.id,
-        resource_type: item.inferredType || formData.resource_type,
-        external_url: currentSubject?.google_drive_folder_url || '',
-        embed_url: currentSubject?.google_drive_folder_url || '',
-        google_drive_folder_url: currentSubject?.google_drive_folder_url,
-        file_name: item.name,
-        original_filename: item.name,
-        mime_type: item.file.type || 'application/pdf',
-        file_size: item.size,
-        file_data: base64Data,
-        source_provider: 'google_drive',
-        tags,
-        slug: slugify(resourceTitle),
-      });
-
-      setFileQueue((prev) =>
-        prev.map((i) => (i.id === itemId ? { ...i, status: 'success', progress: 100 } : i))
-      );
-      setGlobalError(null);
-    } catch (err: any) {
-      setFileQueue((prev) =>
-        prev.map((i) => (i.id === itemId ? { ...i, status: 'error', error: err?.message || 'Direct publish failed.' } : i))
-      );
-    }
-  };
-
-  // Publish all queued files directly to StudyHub (Bypasses Google personal Drive 0-quota limit)
-  const handlePublishAllDirectly = async (data: ResourceFormData) => {
-    setIsProcessingUploads(true);
-    setGlobalError(null);
-
-    const tags = (data.tags_string || '')
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean);
-
-    let anyErrors = false;
-
-    for (const item of fileQueue) {
-      if (item.status === 'success') continue;
-
-      setFileQueue((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, status: 'uploading', progress: 50, error: undefined } : i))
-      );
-
-      try {
-        const base64Data = await fileToBase64(item.file);
-        const resourceTitle =
-          fileQueue.length === 1 && data.title
-            ? data.title
-            : `${data.title || 'Study Material'} - ${item.name.replace(/\.[^/.]+$/, '')}`;
-
-        await onSubmit({
-          ...data,
-          title: resourceTitle,
-          subject_id: currentSubject.id,
-          resource_type: item.inferredType || data.resource_type,
-          external_url: currentSubject?.google_drive_folder_url || '',
-          embed_url: currentSubject?.google_drive_folder_url || '',
-          google_drive_folder_url: currentSubject?.google_drive_folder_url,
-          file_name: item.name,
-          original_filename: item.name,
-          mime_type: item.file.type || 'application/pdf',
-          file_size: item.size,
-          file_data: base64Data,
-          source_provider: 'google_drive',
-          tags,
-          slug: slugify(resourceTitle),
-        });
-
-        setFileQueue((prev) =>
-          prev.map((i) => (i.id === item.id ? { ...i, status: 'success', progress: 100 } : i))
-        );
-      } catch (err: any) {
-        anyErrors = true;
-        setFileQueue((prev) =>
-          prev.map((i) => (i.id === item.id ? { ...i, status: 'error', error: err?.message || 'Direct publish failed.' } : i))
-        );
-      }
-    }
-
-    setIsProcessingUploads(false);
-
-    if (!anyErrors) {
-      setTimeout(() => {
-        onClose();
-      }, 1000);
-    }
-  };
-
-  // Main Form Submission
+  // Main Form Submission to System Backup Storage
   const onFormSubmit = async (data: ResourceFormData) => {
     setGlobalError(null);
 
-    // 1. If files are queued, upload them directly to the subject's Google Drive folder
+    // 1. If files are queued, save them directly to System Storage (Base64 + Supabase + Local)
     if (fileQueue.length > 0) {
-      if (!currentSubject?.google_drive_folder_id) {
-        setGlobalError(
-          `Subject "${currentSubject?.name || 'Selected Subject'}" does not have a valid Google Drive folder configured. Please configure the subject folder in Subjects Management first.`
-        );
-        return;
-      }
-
       setIsProcessingUploads(true);
       let anyErrors = false;
 
@@ -550,152 +300,66 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
       for (const item of fileQueue) {
         if (item.status === 'success') continue;
 
-        // Update item state to uploading
+        // Set item to uploading
         setFileQueue((prev) =>
-          prev.map((i) => (i.id === item.id ? { ...i, status: 'uploading', progress: 20, error: undefined } : i))
+          prev.map((i) => (i.id === item.id ? { ...i, status: 'uploading', progress: 30, error: undefined } : i))
         );
 
-        let driveResult: DriveUploadResult | null = null;
-
-        // 1. Attempt upload to Google Drive folder
-        try {
-          driveResult = await uploadFileToDriveFolder({
-            file: item.file,
-            folderId: currentSubject.google_drive_folder_id,
-            onProgress: (pct) => {
-              setFileQueue((prev) =>
-                prev.map((i) => (i.id === item.id ? { ...i, progress: Math.min(pct, 90) } : i))
-              );
-            },
-          });
-        } catch (uploadErr: any) {
-          console.warn(
-            `Google Drive upload notice for "${item.name}" (${uploadErr?.message}). Auto-switching to direct StudyHub publishing with course Drive folder association.`
-          );
-        }
-
         const resourceTitle =
-          fileQueue.length === 1
+          fileQueue.length === 1 && data.title
             ? data.title
-            : `${data.title} - ${item.name.replace(/\.[^/.]+$/, '')}`;
+            : `${data.title || 'Study Material'} - ${item.name.replace(/\.[^/.]+$/, '')}`;
 
-        // 2. If Google Drive upload succeeded, save with Drive file link
-        if (driveResult) {
-          try {
-            await onSubmit({
-              ...data,
-              title: resourceTitle,
-              subject_id: currentSubject.id,
-              resource_type: item.inferredType || data.resource_type,
-              external_url: driveResult.webViewLink,
-              embed_url: `https://drive.google.com/file/d/${driveResult.fileId}/preview`,
-              google_drive_file_id: driveResult.fileId,
-              google_drive_file_url: driveResult.webViewLink,
-              google_drive_folder_url: currentSubject.google_drive_folder_url,
-              file_name: item.name,
-              original_filename: item.name,
-              mime_type: driveResult.mimeType,
-              file_size: driveResult.fileSize,
-              source_provider: 'google_drive',
-              tags,
-              slug: slugify(resourceTitle),
-            });
+        try {
+          // Convert file to Base64 payload
+          const base64Data = await fileToBase64(item.file);
+          setFileQueue((prev) =>
+            prev.map((i) => (i.id === item.id ? { ...i, progress: 75 } : i))
+          );
 
-            setFileQueue((prev) =>
-              prev.map((i) =>
-                i.id === item.id ? { ...i, status: 'success', progress: 100, driveResult } : i
-              )
-            );
-          } catch (dbErr: any) {
-            console.error('Database metadata save error after Drive upload:', dbErr);
-            anyErrors = true;
-            setFileQueue((prev) =>
-              prev.map((i) =>
-                i.id === item.id
-                  ? {
-                      ...i,
-                      status: 'error',
-                      error: `File uploaded to Drive (ID: ${driveResult?.fileId}), but saving to database failed: ${dbErr?.message || dbErr}. Click Retry to re-save.`,
-                    }
-                  : i
-              )
-            );
-          }
-        } else {
-          // 3. Fallback: Google Drive 0-quota personal account limit or permission restriction.
-          // Save file directly to StudyHub with full file_data Base64 + link to course Google Drive folder.
-          try {
-            setFileQueue((prev) =>
-              prev.map((i) => (i.id === item.id ? { ...i, progress: 90 } : i))
-            );
+          // Save directly into StudyHub system storage
+          await onSubmit({
+            ...data,
+            title: resourceTitle,
+            subject_id: currentSubject?.id || data.subject_id,
+            resource_type: item.inferredType || data.resource_type,
+            external_url: data.external_url || '',
+            embed_url: '',
+            file_name: item.name,
+            original_filename: item.name,
+            mime_type: item.file.type || 'application/pdf',
+            file_size: item.size,
+            file_data: base64Data,
+            source_provider: 'supabase_storage',
+            tags,
+            slug: slugify(resourceTitle),
+          });
 
-            const base64Data = await fileToBase64(item.file);
-
-            await onSubmit({
-              ...data,
-              title: resourceTitle,
-              subject_id: currentSubject.id,
-              resource_type: item.inferredType || data.resource_type,
-              external_url: currentSubject?.google_drive_folder_url || '',
-              embed_url: currentSubject?.google_drive_folder_url || '',
-              google_drive_folder_url: currentSubject?.google_drive_folder_url,
-              file_name: item.name,
-              original_filename: item.name,
-              mime_type: item.file.type || 'application/pdf',
-              file_size: item.size,
-              file_data: base64Data,
-              source_provider: 'google_drive',
-              tags,
-              slug: slugify(resourceTitle),
-            });
-
-            setFileQueue((prev) =>
-              prev.map((i) =>
-                i.id === item.id
-                  ? {
-                      ...i,
-                      status: 'success',
-                      progress: 100,
-                      driveResult: {
-                        success: true,
-                        fileId: 'studyhub-direct',
-                        fileUrl: currentSubject?.google_drive_folder_url || '',
-                        fileName: item.name,
-                        mimeType: item.file.type || 'application/pdf',
-                        fileSize: item.size,
-                        webViewLink: currentSubject?.google_drive_folder_url || '',
-                        folderId: currentSubject?.google_drive_folder_id || '',
-                      },
-                    }
-                  : i
-              )
-            );
-          } catch (directErr: any) {
-            console.error(`Direct StudyHub publish failed for "${item.name}":`, directErr);
-            anyErrors = true;
-            const errorMsg = directErr?.message || 'Publishing failed. Please try again.';
-            setGlobalError(errorMsg);
-            setFileQueue((prev) =>
-              prev.map((i) =>
-                i.id === item.id ? { ...i, status: 'error', error: errorMsg } : i
-              )
-            );
-          }
+          setFileQueue((prev) =>
+            prev.map((i) => (i.id === item.id ? { ...i, status: 'success', progress: 100 } : i))
+          );
+        } catch (uploadErr: any) {
+          console.error(`System storage upload error for "${item.name}":`, uploadErr);
+          anyErrors = true;
+          const msg = uploadErr?.message || 'Failed to save to system storage.';
+          setGlobalError(msg);
+          setFileQueue((prev) =>
+            prev.map((i) => (i.id === item.id ? { ...i, status: 'error', error: msg } : i))
+          );
         }
       }
 
       setIsProcessingUploads(false);
 
       if (!anyErrors) {
-        // All files published successfully
         setTimeout(() => {
           onClose();
-        }, 1000);
+        }, 800);
       }
       return;
     }
 
-    // 2. Direct URL / YouTube / Existing resource edit (No files queued)
+    // 2. Direct URL / YouTube / Existing resource update (No files queued)
     try {
       setIsProcessingUploads(true);
       const tags = (data.tags_string || '')
@@ -704,24 +368,12 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
         .filter(Boolean);
 
       let finalUrl = data.external_url?.trim() || '';
-      let finalProvider = 'google_drive';
+      let finalProvider: SourceProvider = 'direct_url';
       let embedUrl: string | undefined = undefined;
 
-      if (!finalUrl) {
-        if (currentSubject?.google_drive_folder_url) {
-          finalUrl = currentSubject.google_drive_folder_url;
-          if (currentSubject.google_drive_folder_id) {
-            embedUrl = `https://drive.google.com/embeddedfolderview?id=${currentSubject.google_drive_folder_id}#list`;
-          }
-        } else {
-          finalUrl = 'https://drive.google.com';
-        }
-      } else {
+      if (finalUrl) {
         finalProvider = detectSourceProvider(finalUrl);
-        if (finalProvider === 'google_drive') {
-          const parsed = parseGoogleDriveUrl(finalUrl);
-          embedUrl = parsed.embedUrl;
-        } else if (finalProvider === 'youtube') {
+        if (finalProvider === 'youtube') {
           const parsed = parseYouTubeUrl(finalUrl);
           embedUrl = parsed.embedUrl;
         }
@@ -729,10 +381,10 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
 
       await onSubmit({
         ...data,
+        subject_id: currentSubject?.id || data.subject_id,
         external_url: finalUrl,
         source_provider: finalProvider,
         embed_url: embedUrl,
-        google_drive_folder_url: currentSubject?.google_drive_folder_url,
         tags,
         slug: slugify(data.title),
       });
@@ -745,46 +397,21 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
     }
   };
 
-  const hasConfiguredFolder = Boolean(currentSubject?.google_drive_folder_id);
-
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={initialData ? 'Edit Learning Resource' : 'Upload Study Material'}
-      description="Select your subject. Files automatically upload directly into that subject's dedicated Google Drive folder."
+      description="Upload lecture notes, slides, whiteboard photos, or worksheets directly to secure system storage."
       maxWidth="2xl"
     >
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
         {globalError && (
-          <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200 flex items-start justify-between gap-3 flex-wrap">
-            <div className="flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-bold">Notice</p>
-                <p>{globalError}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 ml-auto shrink-0 flex-wrap">
-              {fileQueue.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleSubmit(handlePublishAllDirectly)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-xs flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Publish Directly to StudyHub</span>
-                </button>
-              )}
-              {globalError.includes('Google OAuth Client ID') && (
-                <button
-                  type="button"
-                  onClick={handlePromptClientId}
-                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-xs ml-auto shrink-0"
-                >
-                  Enter Client ID Directly
-                </button>
-              )}
+          <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold">Notice</p>
+              <p>{globalError}</p>
             </div>
           </div>
         )}
@@ -801,7 +428,7 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
             >
               {subjects.map((sub) => (
                 <option key={sub.id} value={sub.id}>
-                  {sub.name} ({sub.code})
+                  {sub.name} {sub.code ? `(${sub.code})` : ''}
                 </option>
               ))}
             </select>
@@ -829,133 +456,39 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
           </div>
         </div>
 
-        {/* STEP 2: Automatic Subject Destination Folder Badge */}
-        {currentSubject && (
-          <div
-            className={`p-3.5 rounded-2xl border transition-all ${
-              hasConfiguredFolder
-                ? 'bg-gradient-to-r from-emerald-50/80 via-teal-50/60 to-emerald-50/40 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-emerald-950/20 border-emerald-200 dark:border-emerald-800/80'
-                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
-            }`}
-          >
-            <div className="flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
-                    hasConfiguredFolder
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-amber-500 text-white'
-                  }`}
-                >
-                  <FolderCheck className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      Destination Folder:
-                    </span>
-                    <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300 truncate">
-                      {currentSubject.name}
-                    </span>
-                    {hasConfiguredFolder ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-full">
-                        <Check className="w-3 h-3" />
-                        <span>Folder ID: {currentSubject.google_drive_folder_id}</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded-full">
-                        <ShieldAlert className="w-3 h-3" />
-                        <span>No Folder Configured</span>
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
-                    {hasConfiguredFolder
-                      ? 'Files selected below will automatically upload directly into this exact Google Drive folder.'
-                      : 'This subject does not have a valid Google Drive folder configured. Please contact the administrator.'}
-                  </p>
-                </div>
+        {/* STEP 2: System Cloud Backup Storage Destination Badge */}
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-emerald-50/50 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-emerald-950/20 border border-emerald-200 dark:border-emerald-800/80">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <ShieldCheck className="w-5 h-5" />
               </div>
-
-              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 flex-wrap">
-                {currentSubject.google_drive_folder_url && (
-                  <a
-                    href={currentSubject.google_drive_folder_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-800 dark:text-emerald-200 bg-white/90 dark:bg-navy-900 border border-emerald-300 dark:border-emerald-700 hover:bg-white flex items-center gap-1 shadow-2xs transition-colors"
-                    title="Open this folder directly in Google Drive"
-                  >
-                    <span>View in Drive</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-
-                {/* Drive Integration State: Service Account or OAuth */}
-                {driveServerStatus?.configured && driveServerStatus.method === 'service_account' ? (
-                  <span className="px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1.5 shadow-2xs">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Auto-Upload Ready</span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    Storage Destination:
                   </span>
-                ) : isGoogleConnected ? (
-                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>OAuth Active</span>
+                  <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300 truncate">
+                    System Cloud Storage ({currentSubject?.name || 'Selected Subject'})
                   </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleAuthorizeGoogleDrive}
-                    disabled={isAuthorizingDrive}
-                    className="px-2.5 py-1 rounded-lg text-xs font-bold text-brand-700 dark:text-brand-300 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800 flex items-center gap-1 transition-colors disabled:opacity-50"
-                    title="Authorize direct Google Drive uploads with your Google Account"
-                  >
-                    <Key className="w-3 h-3 text-brand-600" />
-                    <span>{isAuthorizingDrive ? 'Connecting...' : 'Authorize Drive'}</span>
-                  </button>
-                )}
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                  Files upload directly into our secure platform storage. Instant viewing and downloads for signed-in students.
+                </p>
               </div>
             </div>
 
-            {/* Service Account Sharing Instruction Pill */}
-            {driveServerStatus?.configured && driveServerStatus.serviceAccountEmail && (
-              <div className="mt-3 pt-2.5 border-t border-emerald-200/80 dark:border-emerald-900/60 flex items-center justify-between gap-2 flex-wrap text-[11px]">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span className="text-slate-600 dark:text-slate-400">Drive Editor Email:</span>
-                  <span className="font-mono font-bold text-emerald-950 dark:text-emerald-200 select-all truncate">
-                    {driveServerStatus.serviceAccountEmail}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (driveServerStatus.serviceAccountEmail) {
-                      navigator.clipboard.writeText(driveServerStatus.serviceAccountEmail);
-                      setCopiedSaEmail(true);
-                      setTimeout(() => setCopiedSaEmail(false), 2500);
-                    }
-                  }}
-                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-colors shrink-0"
-                >
-                  {copiedSaEmail ? 'Copied to Clipboard!' : 'Copy Email to Share'}
-                </button>
-              </div>
-            )}
-
-            {driveServerStatus?.error && (
-              <div className="mt-2 text-[11px] text-red-600 dark:text-red-400 font-medium">
-                {driveServerStatus.error}
-              </div>
-            )}
+            <span className="px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1.5 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>System Storage Active</span>
+            </span>
           </div>
-        )}
+        </div>
 
         {/* STEP 3: Drag & Drop Multi-File Upload Zone */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-            Select or Drag Files (Direct Upload to Subject Folder)
+            Select or Drag Files (Upload to System Storage)
           </label>
 
           <input
@@ -1049,47 +582,16 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
 
                       {/* Error Message */}
                       {item.status === 'error' && (
-                        <div className="mt-1.5 p-2 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-[11px] text-red-700 dark:text-red-300 space-y-1.5">
-                          <p className="font-semibold leading-snug">
-                            {item.error || 'Upload failed.'}
-                          </p>
-                          <div className="flex items-center gap-2 flex-wrap pt-0.5">
-                            {currentSubject.google_drive_folder_url && (
-                              <a
-                                href={currentSubject.google_drive_folder_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-2xs"
-                              >
-                                <span>Open Folder in Drive</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            )}
-                            {driveServerStatus?.serviceAccountEmail && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (driveServerStatus.serviceAccountEmail) {
-                                    navigator.clipboard.writeText(driveServerStatus.serviceAccountEmail);
-                                    setCopiedSaEmail(true);
-                                    setTimeout(() => setCopiedSaEmail(false), 2000);
-                                  }
-                                }}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold bg-white dark:bg-navy-900 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-100 transition-colors"
-                              >
-                                <Copy className="w-3 h-3" />
-                                <span>{copiedSaEmail ? 'Copied Email!' : 'Copy Service Account Email'}</span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400 font-semibold">
+                          {item.error || 'Upload failed.'}
+                        </p>
                       )}
 
                       {/* Success confirmation */}
                       {item.status === 'success' && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 truncate mt-0.5 flex items-center gap-1 font-semibold">
                           <Check className="w-3 h-3" />
-                          <span>Uploaded directly to Google Drive folder</span>
+                          <span>Uploaded & Stored in System Storage</span>
                         </p>
                       )}
                     </div>
@@ -1113,31 +615,8 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
                     {item.status === 'success' && (
                       <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md flex items-center gap-1 border border-emerald-200 dark:border-emerald-800">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        <span>Complete</span>
+                        <span>Saved</span>
                       </span>
-                    )}
-
-                    {item.status === 'error' && (
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => handlePublishDirectlyItem(item.id, watch())}
-                          className="text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-md shadow-2xs flex items-center gap-1 transition-colors"
-                          title="Publish directly to Hammad StudyHub (bypasses Google Drive 0-quota limit)"
-                        >
-                          <Sparkles className="w-3 h-3" />
-                          <span>Publish Directly</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRetryItem(item.id, watch())}
-                          className="text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 bg-slate-100 dark:bg-navy-950 px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 flex items-center gap-1"
-                          title="Retry uploading to Google Drive"
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                          <span>Retry Drive</span>
-                        </button>
-                      </div>
                     )}
 
                     {!isProcessingUploads && item.status !== 'success' && (
@@ -1184,7 +663,7 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
               {...register('status')}
               className="w-full text-xs sm:text-sm p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-navy-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500"
             >
-              <option value="published">Published (Visible to students)</option>
+              <option value="published">Published (Visible to registered students)</option>
               <option value="draft">Draft (Private to administrators)</option>
               <option value="archived">Archived</option>
             </select>
@@ -1195,39 +674,39 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              YouTube Video or External Link (Optional)
+              YouTube Video or External Reference Link (Optional)
             </label>
             <span className="text-[10px] text-slate-400">
               Only needed if not uploading files from device
             </span>
           </div>
           <Input
-            placeholder="https://www.youtube.com/watch?v=... (Optional lecture link)"
+            placeholder="https://www.youtube.com/watch?v=... (Optional lecture recording link)"
             leftIcon={<LinkIcon className="w-4 h-4" />}
             error={errors.external_url?.message}
             {...register('external_url')}
           />
 
-          {driveValidation && (
+          {urlValidation && (
             <div
               className={`mt-2 p-2.5 rounded-xl border text-xs flex items-start gap-2 ${
-                driveValidation.isValid
+                urlValidation.isValid
                   ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
                   : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
               }`}
             >
-              {driveValidation.isValid ? (
+              {urlValidation.isValid ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
               ) : (
                 <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               )}
               <div className="space-y-0.5">
                 <p className="font-semibold">
-                  {driveValidation.isValid
-                    ? `Validated ${driveValidation.resourceKind?.replace('_', ' ').toUpperCase()}`
+                  {urlValidation.isValid
+                    ? `Validated ${urlValidation.resourceKind?.replace('_', ' ').toUpperCase()}`
                     : 'Format Notice'}
                 </p>
-                <p className="text-[11px] opacity-90">{driveValidation.permissionNotice || driveValidation.error}</p>
+                <p className="text-[11px] opacity-90">{urlValidation.permissionNotice || urlValidation.error}</p>
               </div>
             </div>
           )}
@@ -1264,50 +743,31 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
 
         {/* Footer Actions */}
         <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3">
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            {hasConfiguredFolder ? (
-              <span>
-                📁 Destination: <strong>{currentSubject?.name}</strong> Google Drive Folder
-              </span>
-            ) : (
-              <span className="text-amber-600 font-semibold">
-                ⚠️ Connect a Google Drive folder to this subject to enable uploads
-              </span>
-            )}
-          </p>
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            <HardDrive className="w-3.5 h-3.5 text-emerald-600" />
+            <span>
+              Destination: <strong>System Cloud Storage</strong> ({currentSubject?.name || 'Selected Course'})
+            </span>
+          </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isProcessingUploads}>
               Cancel
             </Button>
 
-            {fileQueue.length > 0 && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleSubmit(handlePublishAllDirectly)}
-                isLoading={isProcessingUploads}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                leftIcon={<Sparkles className="w-3.5 h-3.5" />}
-                title="Publish directly to StudyHub with course Drive folder link"
-              >
-                Publish Directly to StudyHub
-              </Button>
-            )}
-
             <Button
               type="submit"
               size="sm"
-              disabled={fileQueue.length > 0 && !hasConfiguredFolder}
               isLoading={isLoading || isProcessingUploads}
               leftIcon={<Sparkles className="w-3.5 h-3.5" />}
+              className="bg-brand-600 hover:bg-brand-700 text-white font-bold"
             >
               {isProcessingUploads
-                ? 'Processing & Publishing...'
+                ? 'Saving to System Storage...'
                 : initialData
                 ? 'Update Material'
                 : fileQueue.length > 1
-                ? `Upload & Publish ${fileQueue.length} Files`
+                ? `Publish ${fileQueue.length} Files to System Storage`
                 : 'Upload & Publish Material'}
             </Button>
           </div>

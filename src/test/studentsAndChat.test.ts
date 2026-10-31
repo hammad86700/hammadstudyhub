@@ -266,5 +266,53 @@ describe('In-Platform Messaging & Gender-Aware Rules', () => {
     const all = getDemoResources();
     expect(all.some((r) => r.id === 'res_yt_test_1' && r.source_provider === 'youtube')).toBe(true);
   });
+
+  it('stores uploaded study materials in system backup storage without requiring Google Drive', () => {
+    const subject = saveDemoSubject({
+      id: 'sub_sys_01',
+      name: 'Introduction to Computing',
+      code: 'CS-101',
+      slug: 'intro-to-computing',
+      icon: 'cpu',
+      color: 'blue',
+      is_featured: true,
+      is_active: true,
+      sort_order: 1,
+      folder_configured: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    // Material uploaded to System Cloud Storage (Base64 file_data)
+    const systemResource = saveDemoResource({
+      id: 'res_sys_upload_1',
+      subject_id: subject.id,
+      title: 'Chapter 01: Computer Hardware Architecture',
+      slug: 'chapter-01-hardware-arch',
+      resource_type: 'pdf',
+      source_provider: 'supabase_storage',
+      external_url: '',
+      file_name: 'Chapter01_Architecture.pdf',
+      original_filename: 'Chapter01_Architecture.pdf',
+      file_size: '1.24 MB',
+      file_data: 'data:application/pdf;base64,JVBERi0xLjQKJ...',
+      lesson_date: '2026-10-31',
+      status: 'published',
+      tags: ['hardware', 'architecture', 'notes'],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      subject,
+    });
+
+    expect(systemResource.id).toBe('res_sys_upload_1');
+    expect(systemResource.file_data).toContain('data:application/pdf;base64');
+    expect(systemResource.source_provider).toBe('supabase_storage');
+    expect(systemResource.file_name).toBe('Chapter01_Architecture.pdf');
+
+    const resources = getDemoResources();
+    const stored = resources.find((r) => r.id === 'res_sys_upload_1');
+    expect(stored).toBeDefined();
+    expect(stored?.file_data).toBe('data:application/pdf;base64,JVBERi0xLjQKJ...');
+  });
 });
 

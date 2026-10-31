@@ -247,24 +247,11 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
             {meta.label} Preview
             <span className="text-slate-400 font-normal">
-              ({resource.source_provider === 'google_drive' ? 'Google Drive' : resource.source_provider === 'youtube' ? 'YouTube Player' : 'External Host'})
+              ({resource.file_data ? 'System Cloud Storage' : resource.source_provider === 'youtube' ? 'YouTube Player' : 'External Host'})
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            {(resource.google_drive_folder_url || resource.subject?.google_drive_folder_url) && (
-              <a
-                href={resource.google_drive_folder_url || resource.subject?.google_drive_folder_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors"
-                title="Open Course Google Drive Folder"
-              >
-                <FolderOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                <span>Drive Folder</span>
-              </a>
-            )}
-
             {driveInfo?.directDownloadUrl && (
               <a
                 href={driveInfo.directDownloadUrl}
@@ -314,7 +301,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
               </div>
               <h4 className="text-lg font-bold">Open Resource Directly</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Click below to launch this learning resource in your browser or Google Drive.
+                Click below to launch this learning resource in your browser.
               </p>
               <a
                 href={directTargetUrl}
@@ -329,21 +316,6 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
             </div>
           )}
         </div>
-
-        {/* Google Drive Permission Advisory Notice */}
-        {resource.source_provider === 'google_drive' && (
-          <div className="p-4 bg-slate-50 dark:bg-navy-950/80 border-t border-slate-200 dark:border-slate-800 flex items-start gap-3 text-xs text-slate-600 dark:text-slate-400">
-            <Info className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">
-                Google Drive Access Notice:
-              </p>
-              <p className="mt-0.5">
-                Students can view this resource directly in browser. If you encounter an &quot;Access Denied&quot; message from Google, the file owner has not yet enabled public link sharing. Please click <button onClick={() => setReportModalOpen(true)} className="text-brand-600 dark:text-brand-400 font-semibold underline">Report Issue</button> to alert Muhammad Hammad.
-              </p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Tags Section */}

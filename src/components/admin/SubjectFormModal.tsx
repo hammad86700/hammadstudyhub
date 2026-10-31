@@ -21,7 +21,7 @@ const subjectSchema = z.object({
   code: z.string().optional(),
   description: z.string().optional(),
   instructor: z.string().optional(),
-  google_drive_folder_url: z.string().min(1, 'Google Drive folder sharing URL is required.'),
+  google_drive_folder_url: z.string().optional(),
   icon: z.string().default('book-open'),
   color: z.string().default('blue'),
   is_featured: z.boolean().default(false),
@@ -115,25 +115,18 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
       const slug = data.slug?.trim() ? slugify(data.slug) : slugify(data.name);
 
       let driveUrl = data.google_drive_folder_url?.trim() || '';
-      if (!driveUrl) {
-        setFormError('Google Drive Folder URL is required for this subject.');
-        setIsSubmitting(false);
-        return;
-      }
+      let folderId: string | undefined = undefined;
 
-      if (!driveUrl.startsWith('http://') && !driveUrl.startsWith('https://')) {
-        driveUrl = 'https://' + driveUrl;
-      }
+      if (driveUrl) {
+        if (!driveUrl.startsWith('http://') && !driveUrl.startsWith('https://')) {
+          driveUrl = 'https://' + driveUrl;
+        }
 
-      const parsed = parseGoogleDriveUrl(driveUrl);
-      if (!parsed.isValid || !parsed.folderId) {
-        setFormError(
-          'Invalid Google Drive folder link. Please paste a valid folder sharing URL (e.g. https://drive.google.com/drive/folders/1ABC...). The folder ID could not be detected.'
-        );
-        setIsSubmitting(false);
-        return;
+        const parsed = parseGoogleDriveUrl(driveUrl);
+        if (parsed.isValid && parsed.folderId) {
+          folderId = parsed.folderId;
+        }
       }
-      const folderId = parsed.folderId;
 
       // Auto-generate course code if left empty
       let courseCode = data.code?.trim() || '';
@@ -150,7 +143,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         ...data,
         code: courseCode,
         slug,
-        google_drive_folder_url: driveUrl,
+        google_drive_folder_url: driveUrl || undefined,
         google_drive_folder_id: folderId,
         folder_configured: true,
       });
@@ -215,13 +208,13 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
           {...register('description')}
         />
 
-        {/* Google Drive Subject Folder (Required - Configure Once) */}
-        <div className="p-3.5 rounded-2xl bg-brand-50/60 dark:bg-navy-950/60 border border-brand-200 dark:border-brand-900/60 space-y-2">
+        {/* External Drive Link (Optional) */}
+        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-navy-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FolderCheck className="w-4 h-4 text-brand-600" />
-              <label className="text-xs font-bold text-brand-900 dark:text-brand-200">
-                Google Drive Folder Sharing Link <span className="text-red-500">*</span>
+              <label className="text-xs font-bold text-slate-900 dark:text-white">
+                External Cloud Folder Link (Optional)
               </label>
             </div>
             {isFolderLockedForCR && (
@@ -233,14 +226,9 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
           </div>
           <Input
             type="text"
-            required
             disabled={isFolderLockedForCR}
-            placeholder="https://drive.google.com/drive/folders/1ABC... (Paste Google Drive folder sharing link)"
-            helperText={
-              isFolderLockedForCR
-                ? "This subject is linked to Google Drive. Only the Master Administrator can edit or change this folder link."
-                : "Paste the Google Drive folder link for this subject. All future uploads for this subject will automatically upload directly into this folder!"
-            }
+            placeholder="https://drive.google.com/drive/folders/... (Optional backup link)"
+            helperText="Optional external folder link. Files will automatically be stored in StudyHub system cloud storage regardless."
             error={errors.google_drive_folder_url?.message}
             {...register('google_drive_folder_url')}
           />
