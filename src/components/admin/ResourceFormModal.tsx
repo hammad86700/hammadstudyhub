@@ -323,6 +323,19 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
     }
   };
 
+  const handlePromptClientId = () => {
+    const existing = localStorage.getItem('studyhub_custom_google_client_id') || '';
+    const input = window.prompt(
+      'Paste your Google OAuth Client ID from Google Cloud Console (e.g. xxxxx.apps.googleusercontent.com):',
+      existing
+    );
+    if (input && input.trim()) {
+      localStorage.setItem('studyhub_custom_google_client_id', input.trim());
+      setGlobalError(null);
+      handleAuthorizeGoogleDrive();
+    }
+  };
+
   // Single Item Retry
   const handleRetryItem = async (itemId: string, formData: ResourceFormData) => {
     const item = fileQueue.find((i) => i.id === itemId);
@@ -555,12 +568,23 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
     >
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
         {globalError && (
-          <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-bold">Notice</p>
-              <p>{globalError}</p>
+          <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold">Notice</p>
+                <p>{globalError}</p>
+              </div>
             </div>
+            {globalError.includes('Google OAuth Client ID') && (
+              <button
+                type="button"
+                onClick={handlePromptClientId}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-xs ml-auto shrink-0"
+              >
+                Enter Client ID Directly
+              </button>
+            )}
           </div>
         )}
 

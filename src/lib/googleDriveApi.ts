@@ -108,10 +108,19 @@ export function formatFileSize(bytes: number): string {
 export async function requestGoogleDriveAuthorization(clientId?: string): Promise<string> {
   const resolvedClientId =
     clientId ||
+    localStorage.getItem('studyhub_custom_google_client_id') ||
     (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) ||
     '';
 
   if (!resolvedClientId) {
+    const promptInput = window.prompt(
+      'Google OAuth Client ID is not configured in Vercel environment variables yet.\n\nPaste your Google OAuth Client ID from Google Cloud Console (e.g. xxxxx.apps.googleusercontent.com):'
+    );
+    if (promptInput && promptInput.trim()) {
+      const cleanId = promptInput.trim();
+      localStorage.setItem('studyhub_custom_google_client_id', cleanId);
+      return requestGoogleDriveAuthorization(cleanId);
+    }
     throw new Error(
       'Google OAuth Client ID is not configured (VITE_GOOGLE_CLIENT_ID). Please provide a Client ID or configure server-side GOOGLE_SERVICE_ACCOUNT_KEY.'
     );
