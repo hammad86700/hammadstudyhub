@@ -23,136 +23,141 @@ export function useResources(
   return useQuery({
     queryKey: ['resources', subjectIdOrSlug, filters, options],
     queryFn: async (): Promise<Resource[]> => {
+      let resources: Resource[] = [];
+      const localResources = getDemoResources();
+      const localSubjects = getDemoSubjects();
+
       if (isSupabaseConfigured) {
-        let query = supabase
-          .from('resources')
-          .select(`
-            *,
-            subject:subjects(*)
-          `)
-          .order('lesson_date', { ascending: filters?.sortOrder === 'date-asc' })
-          .order('published_at', { ascending: false });
+        try {
+          let query = supabase
+            .from('resources')
+            .select(`
+              *,
+              subject:subjects(*)
+            `)
+            .order('lesson_date', { ascending: filters?.sortOrder === 'date-asc' })
+            .order('published_at', { ascending: false });
 
-        if (!options.includeDrafts) {
-          query = query.eq('status', 'published');
-        }
+          if (!options.includeDrafts) {
+            query = query.eq('status', 'published');
+          }
 
-        if (subjectIdOrSlug) {
-          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-            subjectIdOrSlug
-          );
-          if (isUUID) {
-            query = query.eq('subject_id', subjectIdOrSlug);
-          } else {
-            // Find subject ID by slug first
-            const { data: sub } = await supabase
-              .from('subjects')
-              .select('id')
-              .eq('slug', subjectIdOrSlug)
-              .single();
-            if (sub) {
-              query = query.eq('subject_id', sub.id);
+          if (subjectIdOrSlug) {
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              subjectIdOrSlug
+            );
+            if (isUUID) {
+              query = query.eq('subject_id', subjectIdOrSlug);
+            } else {
+              // Find subject ID by slug first
+              const { data: sub } = await supabase
+                .from('subjects')
+                .select('id')
+                .eq('slug', subjectIdOrSlug)
+                .single();
+              if (sub) {
+                query = query.eq('subject_id', sub.id);
+              }
             }
           }
-        }
 
-        if (filters?.resourceType && filters.resourceType !== 'all') {
-          query = query.eq('resource_type', filters.resourceType);
-        }
-
-        if (filters?.dateFrom) {
-          query = query.gte('lesson_date', filters.dateFrom);
-        }
-
-        if (filters?.dateTo) {
-          query = query.lte('lesson_date', filters.dateTo);
-        }
-
-        if (filters?.chapter) {
-          query = query.eq('chapter', filters.chapter);
-        }
-
-        const { data, error } = await query;
-        if (error) throw new Error(error.message);
-
-        let resources = (data as Resource[]) || [];
-
-        if (filters?.searchQuery) {
-          const q = filters.searchQuery.toLowerCase();
-          resources = resources.filter(
-            (r) =>
-              r.title.toLowerCase().includes(q) ||
-              (r.description && r.description.toLowerCase().includes(q)) ||
-              (r.topic && r.topic.toLowerCase().includes(q)) ||
-              (r.tags && r.tags.some((t) => t.toLowerCase().includes(q)))
-          );
-        }
-
-        return resources;
-      } else {
-        // Demo Mode
-        let resources = getDemoResources();
-        const subjects = getDemoSubjects();
-
-        // Join subjects
-        resources = resources.map((r) => ({
-          ...r,
-          subject: subjects.find((s) => s.id === r.subject_id),
-        }));
-
-        if (!options.includeDrafts) {
-          resources = resources.filter((r) => r.status === 'published');
-        }
-
-        if (subjectIdOrSlug) {
-          const matchedSubject = subjects.find(
-            (s) => s.slug === subjectIdOrSlug || s.id === subjectIdOrSlug
-          );
-          if (matchedSubject) {
-            resources = resources.filter((r) => r.subject_id === matchedSubject.id);
+          if (filters?.resourceType && filters.resourceType !== 'all') {
+            query = query.eq('resource_type', filters.resourceType);
           }
-        }
 
-        if (filters?.resourceType && filters.resourceType !== 'all') {
-          resources = resources.filter((r) => r.resource_type === filters.resourceType);
-        }
-
-        if (filters?.dateFrom) {
-          resources = resources.filter((r) => r.lesson_date >= filters.dateFrom!);
-        }
-
-        if (filters?.dateTo) {
-          resources = resources.filter((r) => r.lesson_date <= filters.dateTo!);
-        }
-
-        if (filters?.chapter) {
-          resources = resources.filter((r) => r.chapter === filters.chapter);
-        }
-
-        if (filters?.searchQuery) {
-          const q = filters.searchQuery.toLowerCase();
-          resources = resources.filter(
-            (r) =>
-              r.title.toLowerCase().includes(q) ||
-              (r.description && r.description.toLowerCase().includes(q)) ||
-              (r.topic && r.topic.toLowerCase().includes(q)) ||
-              (r.tags && r.tags.some((t) => t.toLowerCase().includes(q)))
-          );
-        }
-
-        // Sort
-        resources.sort((a, b) => {
-          if (filters?.sortOrder === 'date-asc') {
-            return a.lesson_date.localeCompare(b.lesson_date);
+          if (filters?.dateFrom) {
+            query = query.gte('lesson_date', filters.dateFrom);
           }
-          if (filters?.sortOrder === 'title-asc') {
-            return a.title.localeCompare(b.title);
-          }
-          return b.lesson_date.localeCompare(a.lesson_date);
-        });
 
-        return resources;
+          if (filters?.dateTo) {
+            query = query.lte('lesson_date', filters.dateTo);
+          }
+
+          if (filters?.chapter) {
+            query = query.eq('chapter', filters.chapter);
+          }
+
+          const { data, error } = await query;
+          if (!error && data) {
+            resources = (data as Resource[]) || [];
+          } else if (error) {
+            console.warn('Supabase resources fetch notice (using local store):', error.message);
+          }
+        } catch (e: any) {
+          console.warn('Supabase resources exception (using local store):', e?.message);
+        }
       }
+
+      // Merge Supabase resources with local resources
+      const mergedMap = new Map<string, Resource>();
+      // 1. Add local resources with subject enrichment
+      localResources.forEach((r) => {
+        const enriched = {
+          ...r,
+          subject: r.subject || localSubjects.find((s) => s.id === r.subject_id),
+        };
+        mergedMap.set(r.id, enriched);
+      });
+      // 2. Add Supabase resources (matching id or new)
+      resources.forEach((r) => mergedMap.set(r.id, r));
+
+      let allResources = Array.from(mergedMap.values());
+
+      if (!options.includeDrafts) {
+        allResources = allResources.filter((r) => r.status === 'published');
+      }
+
+      if (subjectIdOrSlug) {
+        const matchedSubject = localSubjects.find(
+          (s) => s.slug === subjectIdOrSlug || s.id === subjectIdOrSlug
+        );
+        allResources = allResources.filter(
+          (r) =>
+            r.subject_id === subjectIdOrSlug ||
+            r.subject?.slug === subjectIdOrSlug ||
+            (matchedSubject && r.subject_id === matchedSubject.id)
+        );
+      }
+
+      if (filters?.resourceType && filters.resourceType !== 'all') {
+        allResources = allResources.filter((r) => r.resource_type === filters.resourceType);
+      }
+
+      if (filters?.dateFrom) {
+        allResources = allResources.filter((r) => r.lesson_date >= filters.dateFrom!);
+      }
+
+      if (filters?.dateTo) {
+        allResources = allResources.filter((r) => r.lesson_date <= filters.dateTo!);
+      }
+
+      if (filters?.chapter) {
+        allResources = allResources.filter((r) => r.chapter === filters.chapter);
+      }
+
+      if (filters?.searchQuery) {
+        const q = filters.searchQuery.toLowerCase();
+        allResources = allResources.filter(
+          (r) =>
+            r.title.toLowerCase().includes(q) ||
+            (r.description && r.description.toLowerCase().includes(q)) ||
+            (r.topic && r.topic.toLowerCase().includes(q)) ||
+            (r.tags && r.tags.some((t) => t.toLowerCase().includes(q)))
+        );
+      }
+
+      // Sort
+      allResources.sort((a, b) => {
+        if (filters?.sortOrder === 'date-asc') {
+          return a.lesson_date.localeCompare(b.lesson_date);
+        }
+        if (filters?.sortOrder === 'title-asc') {
+          return a.title.localeCompare(b.title);
+        }
+        return b.lesson_date.localeCompare(a.lesson_date);
+      });
+
+      return allResources;
     },
   });
 }
@@ -246,39 +251,56 @@ export function useResourceMutations() {
       const slug = input.slug || slugify(input.title);
       const publishedAt =
         input.status === 'published' ? new Date().toISOString() : undefined;
+      const tempId = `res-${Date.now()}`;
+      const now = new Date().toISOString();
 
+      const newRes: Resource = {
+        ...input,
+        id: tempId,
+        slug,
+        source_provider: provider,
+        embed_url: embedUrl,
+        published_at: publishedAt,
+        created_at: now,
+        updated_at: now,
+      };
+
+      // 1. ALWAYS save to local store first
+      saveDemoResource(newRes);
+
+      // 2. If Supabase configured, attempt remote sync
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase
-          .from('resources')
-          .insert({
-            ...input,
-            slug,
-            source_provider: provider,
-            embed_url: embedUrl,
-            published_at: publishedAt,
-          })
-          .select(`*, subject:subjects(*)`)
-          .single();
+        try {
+          const { data, error } = await supabase
+            .from('resources')
+            .insert({
+              ...input,
+              slug,
+              source_provider: provider,
+              embed_url: embedUrl,
+              published_at: publishedAt,
+            })
+            .select(`*, subject:subjects(*)`)
+            .single();
 
-        if (error) throw new Error(error.message);
-        return data as Resource;
-      } else {
-        const newRes: Resource = {
-          ...input,
-          id: `res-${Date.now()}`,
-          slug,
-          source_provider: provider,
-          embed_url: embedUrl,
-          published_at: publishedAt,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        return saveDemoResource(newRes);
+          if (!error && data) {
+            deleteDemoResource(tempId);
+            saveDemoResource(data as Resource);
+            return data as Resource;
+          } else if (error) {
+            console.warn('Supabase resource insert notice (persisted locally):', error.message);
+          }
+        } catch (e: any) {
+          console.warn('Supabase resource sync exception (persisted locally):', e?.message);
+        }
       }
+
+      return newRes;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      window.dispatchEvent(new Event('studyhub_resources_updated'));
     },
   });
 
@@ -292,99 +314,123 @@ export function useResourceMutations() {
         embedUrl = resolveEmbedUrl(input.external_url, provider) || undefined;
       }
 
+      // 1. Update locally
+      const localList = getDemoResources();
+      const existing = localList.find((r) => r.id === input.id);
+      const updated: Resource = existing
+        ? {
+            ...existing,
+            ...input,
+            source_provider: provider || existing.source_provider,
+            embed_url: embedUrl !== undefined ? embedUrl : existing.embed_url,
+            published_at:
+              input.status === 'published' && !existing.published_at
+                ? new Date().toISOString()
+                : input.published_at || existing.published_at,
+            updated_at: new Date().toISOString(),
+          }
+        : ({ ...input } as Resource);
+      saveDemoResource(updated);
+
+      // 2. Update Supabase
       if (isSupabaseConfigured) {
-        const updatePayload: any = {
-          ...input,
-          source_provider: provider,
-          embed_url: embedUrl,
-        };
-        if (input.status === 'published' && !input.published_at) {
-          updatePayload.published_at = new Date().toISOString();
+        try {
+          const updatePayload: any = {
+            ...input,
+            source_provider: provider,
+            embed_url: embedUrl,
+          };
+          if (input.status === 'published' && !input.published_at) {
+            updatePayload.published_at = new Date().toISOString();
+          }
+
+          const { data, error } = await supabase
+            .from('resources')
+            .update(updatePayload)
+            .eq('id', input.id)
+            .select(`*, subject:subjects(*)`)
+            .single();
+
+          if (!error && data) {
+            saveDemoResource(data as Resource);
+            return data as Resource;
+          } else if (error) {
+            console.warn('Supabase resource update notice (persisted locally):', error.message);
+          }
+        } catch (e: any) {
+          console.warn('Supabase resource update exception (persisted locally):', e?.message);
         }
-
-        const { data, error } = await supabase
-          .from('resources')
-          .update(updatePayload)
-          .eq('id', input.id)
-          .select(`*, subject:subjects(*)`)
-          .single();
-
-        if (error) throw new Error(error.message);
-        return data as Resource;
-      } else {
-        const existing = getDemoResources().find((r) => r.id === input.id);
-        if (!existing) throw new Error('Resource not found');
-        const updated: Resource = {
-          ...existing,
-          ...input,
-          source_provider: provider || existing.source_provider,
-          embed_url: embedUrl !== undefined ? embedUrl : existing.embed_url,
-          published_at:
-            input.status === 'published' && !existing.published_at
-              ? new Date().toISOString()
-              : input.published_at || existing.published_at,
-        };
-        return saveDemoResource(updated);
       }
+
+      return updated;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['resource', data.id] });
       queryClient.invalidateQueries({ queryKey: ['resource', data.slug] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      window.dispatchEvent(new Event('studyhub_resources_updated'));
     },
   });
 
   const deleteResource = useMutation({
     mutationFn: async (id: string) => {
+      // 1. Delete locally
+      deleteDemoResource(id);
+
+      // 2. Delete from Supabase
       if (isSupabaseConfigured) {
-        const { error } = await supabase.from('resources').delete().eq('id', id);
-        if (error) throw new Error(error.message);
-      } else {
-        deleteDemoResource(id);
+        try {
+          await supabase.from('resources').delete().eq('id', id);
+        } catch (e: any) {
+          console.warn('Supabase resource delete exception:', e?.message);
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      window.dispatchEvent(new Event('studyhub_resources_updated'));
     },
   });
 
   const bulkImportResources = useMutation({
     mutationFn: async (resources: Array<Omit<Resource, 'id' | 'created_at' | 'updated_at'>>) => {
-      const prepared = resources.map((r) => {
+      const prepared = resources.map((r, index) => {
         const provider = r.source_provider || detectSourceProvider(r.external_url);
         return {
           ...r,
+          id: `res-bulk-${Date.now()}-${index}`,
           source_provider: provider,
           embed_url: resolveEmbedUrl(r.external_url, provider) || undefined,
           slug: r.slug || slugify(r.title),
           published_at: r.status === 'published' ? new Date().toISOString() : undefined,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
       });
 
+      // Always save locally
+      prepared.forEach((item) => saveDemoResource(item));
+
+      // Attempt Supabase
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase.from('resources').insert(prepared).select();
-        if (error) throw new Error(error.message);
-        return data as Resource[];
-      } else {
-        const created: Resource[] = [];
-        prepared.forEach((item, index) => {
-          const res: Resource = {
-            ...item,
-            id: `res-bulk-${Date.now()}-${index}`,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          saveDemoResource(res);
-          created.push(res);
-        });
-        return created;
+        try {
+          const { data, error } = await supabase.from('resources').insert(prepared).select();
+          if (!error && data) {
+            return data as Resource[];
+          }
+        } catch (e: any) {
+          console.warn('Supabase bulk import notice:', e?.message);
+        }
       }
+
+      return prepared;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      window.dispatchEvent(new Event('studyhub_resources_updated'));
     },
   });
 

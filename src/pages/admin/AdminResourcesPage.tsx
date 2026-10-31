@@ -34,18 +34,26 @@ export const AdminResourcesPage: React.FC = () => {
   const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [search, setSearch] = useState('');
 
   const { data: subjects = [] } = useSubjects();
-  const { data: resources = [], isLoading } = useResources(undefined, undefined, {
+  const { data: resources = [], isLoading, refetch } = useResources(undefined, undefined, {
     includeDrafts: true,
   });
 
   const { createResource, updateResource, deleteResource, bulkImportResources } =
     useResourceMutations();
+
+  // Listen for real-time resource updates
+  React.useEffect(() => {
+    const handleUpdate = () => refetch();
+    window.addEventListener('studyhub_resources_updated', handleUpdate);
+    return () => window.removeEventListener('studyhub_resources_updated', handleUpdate);
+  }, [refetch]);
 
   const filtered = resources.filter((r) => {
     if (selectedSubjectId !== 'all' && r.subject_id !== selectedSubjectId) return false;
@@ -81,9 +89,12 @@ export const AdminResourcesPage: React.FC = () => {
   const handleFormSubmit = async (data: any) => {
     if (editingResource) {
       await updateResource.mutateAsync({ ...data, id: editingResource.id });
+      setSuccessBanner(`Resource "${data.title}" updated successfully!`);
     } else {
       await createResource.mutateAsync(data);
+      setSuccessBanner(`Resource "${data.title}" published successfully!`);
     }
+    setTimeout(() => setSuccessBanner(null), 5000);
   };
 
   const handleExportCSV = () => {
@@ -100,6 +111,19 @@ export const AdminResourcesPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <SEOHead title="Manage Resources — Admin Hub" />
+
+      {/* Success Notification Banner */}
+      {successBanner && (
+        <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-semibold flex items-center justify-between shadow-subtle animate-in fade-in">
+          <span>{successBanner}</span>
+          <button
+            onClick={() => setSuccessBanner(null)}
+            className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

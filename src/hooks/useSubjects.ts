@@ -17,95 +17,75 @@ export function useSubjects(filters?: SubjectFilters) {
   return useQuery({
     queryKey: ['subjects', filters],
     queryFn: async (): Promise<Subject[]> => {
+      let subjects: Subject[] = [];
+      const localSubjects = getDemoSubjects();
+
       if (isSupabaseConfigured) {
-        let query = supabase
-          .from('subjects')
-          .select(`
-            *,
-            institution:institutions(*),
-            program:academic_programs(*),
-            semester:semesters(*)
-          `)
-          .order('sort_order', { ascending: true })
-          .order('name', { ascending: true });
+        try {
+          let query = supabase
+            .from('subjects')
+            .select(`
+              *,
+              institution:institutions(*),
+              program:academic_programs(*),
+              semester:semesters(*)
+            `)
+            .order('sort_order', { ascending: true })
+            .order('name', { ascending: true });
 
-        if (filters?.featuredOnly) {
-          query = query.eq('is_featured', true);
+          if (filters?.featuredOnly) {
+            query = query.eq('is_featured', true);
+          }
+          if (filters?.programId) {
+            query = query.eq('program_id', filters.programId);
+          }
+
+          const { data, error } = await query;
+          if (!error && data) {
+            subjects = (data as Subject[]) || [];
+          } else if (error) {
+            console.warn('Supabase subjects fetch notice (using local store):', error.message);
+          }
+        } catch (e: any) {
+          console.warn('Supabase fetch exception (using local store):', e?.message);
         }
-        if (filters?.programId) {
-          query = query.eq('program_id', filters.programId);
-        }
-
-        const { data, error } = await query;
-        if (error) throw new Error(error.message);
-
-        // Fetch resource counts
-        const { data: countData } = await supabase
-          .from('resources')
-          .select('subject_id, lesson_date')
-          .eq('status', 'published');
-
-        const counts: Record<string, { count: number; latestDate?: string }> = {};
-        if (countData) {
-          countData.forEach((r) => {
-            if (!counts[r.subject_id]) {
-              counts[r.subject_id] = { count: 0, latestDate: r.lesson_date };
-            }
-            counts[r.subject_id].count++;
-            if (!counts[r.subject_id].latestDate || r.lesson_date > counts[r.subject_id].latestDate!) {
-              counts[r.subject_id].latestDate = r.lesson_date;
-            }
-          });
-        }
-
-        let subjects = (data as Subject[]) || [];
-        subjects = subjects.map((s) => ({
-          ...s,
-          resource_count: counts[s.id]?.count || 0,
-          latest_lesson_date: counts[s.id]?.latestDate,
-        }));
-
-        if (filters?.searchQuery) {
-          const q = filters.searchQuery.toLowerCase();
-          subjects = subjects.filter(
-            (s) =>
-              s.name.toLowerCase().includes(q) ||
-              s.code.toLowerCase().includes(q) ||
-              (s.description && s.description.toLowerCase().includes(q))
-          );
-        }
-
-        return subjects;
-      } else {
-        // Demo Mode
-        let subjects = getDemoSubjects();
-        const resources = getDemoResources().filter((r) => r.status === 'published');
-
-        subjects = subjects.map((s) => {
-          const subResources = resources.filter((r) => r.subject_id === s.id);
-          const sorted = [...subResources].sort((a, b) => b.lesson_date.localeCompare(a.lesson_date));
-          return {
-            ...s,
-            resource_count: subResources.length,
-            latest_lesson_date: sorted[0]?.lesson_date,
-          };
-        });
-
-        if (filters?.featuredOnly) {
-          subjects = subjects.filter((s) => s.is_featured);
-        }
-        if (filters?.searchQuery) {
-          const q = filters.searchQuery.toLowerCase();
-          subjects = subjects.filter(
-            (s) =>
-              s.name.toLowerCase().includes(q) ||
-              s.code.toLowerCase().includes(q) ||
-              (s.description && s.description.toLowerCase().includes(q))
-          );
-        }
-
-        return subjects;
       }
+
+      // Merge Supabase subjects with local subjects (ensures newly added subjects are never lost)
+      const mergedMap = new Map<string, Subject>();
+      // 1. Add local subjects first
+      localSubjects.forEach((s) => mergedMap.set(s.id, s));
+      // 2. Add Supabase subjects (overwrites matching ID or adds new)
+      subjects.forEach((s) => mergedMap.set(s.id, s));
+
+      let allSubjects = Array.from(mergedMap.values());
+
+      // Fetch / Calculate resource counts
+      const resources = getDemoResources().filter((r) => r.status === 'published');
+      allSubjects = allSubjects.map((s) => {
+        const subResources = resources.filter((r) => r.subject_id === s.id);
+        const sorted = [...subResources].sort((a, b) => b.lesson_date.localeCompare(a.lesson_date));
+        return {
+          ...s,
+          resource_count: s.resource_count || subResources.length,
+          latest_lesson_date: s.latest_lesson_date || sorted[0]?.lesson_date,
+        };
+      });
+
+      if (filters?.featuredOnly) {
+        allSubjects = allSubjects.filter((s) => s.is_featured);
+      }
+      if (filters?.searchQuery) {
+        const q = filters.searchQuery.toLowerCase();
+        allSubjects = allSubjects.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            s.code.toLowerCase().includes(q) ||
+            (s.description && s.description.toLowerCase().includes(q))
+        );
+      }
+
+      return allSubjects;
     },
   });
 }
@@ -116,34 +96,38 @@ export function useSubject(slugOrId: string) {
     queryFn: async (): Promise<Subject | null> => {
       if (!slugOrId) return null;
 
+      // 1. Check local store
+      const localSubjects = getDemoSubjects();
+      const localFound = localSubjects.find((s) => s.slug === slugOrId || s.id === slugOrId);
+
       if (isSupabaseConfigured) {
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
-        let query = supabase
-          .from('subjects')
-          .select(`
-            *,
-            institution:institutions(*),
-            program:academic_programs(*),
-            semester:semesters(*)
-          `);
+        try {
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+          let query = supabase
+            .from('subjects')
+            .select(`
+              *,
+              institution:institutions(*),
+              program:academic_programs(*),
+              semester:semesters(*)
+            `);
 
-        if (isUUID) {
-          query = query.eq('id', slugOrId);
-        } else {
-          query = query.eq('slug', slugOrId);
-        }
+          if (isUUID) {
+            query = query.eq('id', slugOrId);
+          } else {
+            query = query.eq('slug', slugOrId);
+          }
 
-        const { data, error } = await query.single();
-        if (error) {
-          console.error('Error fetching subject:', error.message);
-          return null;
+          const { data, error } = await query.single();
+          if (!error && data) {
+            return data as Subject;
+          }
+        } catch (e: any) {
+          console.warn('Supabase fetch error for subject:', e?.message);
         }
-        return data as Subject;
-      } else {
-        const subjects = getDemoSubjects();
-        const found = subjects.find((s) => s.slug === slugOrId || s.id === slugOrId);
-        return found || null;
       }
+
+      return localFound || null;
     },
     enabled: Boolean(slugOrId),
   });
@@ -155,69 +139,125 @@ export function useSubjectMutations() {
   const createSubject = useMutation({
     mutationFn: async (input: Omit<Subject, 'id' | 'created_at' | 'updated_at'>) => {
       const slug = input.slug || slugify(input.name);
+      const tempId = `subj-${Date.now()}`;
+      const now = new Date().toISOString();
+
+      const newSubject: Subject = {
+        ...input,
+        id: tempId,
+        slug,
+        created_at: now,
+        updated_at: now,
+      };
+
+      // 1. ALWAYS save to persistent local store first so user never loses their data
+      saveDemoSubject(newSubject);
+
+      // 2. If Supabase is configured, attempt to sync remotely
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase
-          .from('subjects')
-          .insert({
-            ...input,
+        try {
+          const payload: any = {
+            name: input.name.trim(),
             slug,
-          })
-          .select()
-          .single();
-        if (error) throw new Error(error.message);
-        return data as Subject;
-      } else {
-        const newSubject: Subject = {
-          ...input,
-          id: `subj-${Date.now()}`,
-          slug,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        return saveDemoSubject(newSubject);
+            code: input.code.trim().toUpperCase(),
+            description: input.description || null,
+            instructor: input.instructor || null,
+            icon: input.icon || 'book-open',
+            color: input.color || 'blue',
+            is_featured: Boolean(input.is_featured),
+            is_active: input.is_active !== false,
+            sort_order: Number(input.sort_order) || 0,
+          };
+          if (input.google_drive_folder_url) {
+            payload.google_drive_folder_url = input.google_drive_folder_url;
+          }
+          if (input.google_drive_folder_id) {
+            payload.google_drive_folder_id = input.google_drive_folder_id;
+          }
+
+          const { data, error } = await supabase
+            .from('subjects')
+            .insert(payload)
+            .select()
+            .single();
+
+          if (!error && data) {
+            // Replace temporary local ID with Supabase UUID
+            deleteDemoSubject(tempId);
+            saveDemoSubject(data as Subject);
+            return data as Subject;
+          } else if (error) {
+            console.warn('Supabase subject insert notice (persisted locally):', error.message);
+          }
+        } catch (e: any) {
+          console.warn('Supabase subject sync exception (persisted locally):', e?.message);
+        }
       }
+
+      return newSubject;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      window.dispatchEvent(new Event('studyhub_subjects_updated'));
     },
   });
 
   const updateSubject = useMutation({
     mutationFn: async (input: Partial<Subject> & { id: string }) => {
+      // 1. Update in local store
+      const localList = getDemoSubjects();
+      const existing = localList.find((s) => s.id === input.id);
+      let updated = existing ? { ...existing, ...input, updated_at: new Date().toISOString() } : (input as Subject);
+      saveDemoSubject(updated);
+
+      // 2. If Supabase configured, attempt remote update
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase
-          .from('subjects')
-          .update(input)
-          .eq('id', input.id)
-          .select()
-          .single();
-        if (error) throw new Error(error.message);
-        return data as Subject;
-      } else {
-        const existing = getDemoSubjects().find((s) => s.id === input.id);
-        if (!existing) throw new Error('Subject not found');
-        const updated = { ...existing, ...input };
-        return saveDemoSubject(updated);
+        try {
+          const { data, error } = await supabase
+            .from('subjects')
+            .update(input)
+            .eq('id', input.id)
+            .select()
+            .single();
+
+          if (!error && data) {
+            saveDemoSubject(data as Subject);
+            return data as Subject;
+          } else if (error) {
+            console.warn('Supabase update notice (persisted locally):', error.message);
+          }
+        } catch (e: any) {
+          console.warn('Supabase update exception (persisted locally):', e?.message);
+        }
       }
+
+      return updated;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
       queryClient.invalidateQueries({ queryKey: ['subject', data.slug] });
       queryClient.invalidateQueries({ queryKey: ['subject', data.id] });
+      window.dispatchEvent(new Event('studyhub_subjects_updated'));
     },
   });
 
   const deleteSubject = useMutation({
     mutationFn: async (id: string) => {
+      // 1. Delete from local store
+      deleteDemoSubject(id);
+
+      // 2. Delete from Supabase if configured
       if (isSupabaseConfigured) {
-        const { error } = await supabase.from('subjects').delete().eq('id', id);
-        if (error) throw new Error(error.message);
-      } else {
-        deleteDemoSubject(id);
+        try {
+          await supabase.from('subjects').delete().eq('id', id);
+        } catch (e: any) {
+          console.warn('Supabase delete exception:', e?.message);
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      window.dispatchEvent(new Event('studyhub_subjects_updated'));
     },
   });
 

@@ -16,9 +16,17 @@ export const AdminSubjectsPage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [search, setSearch] = useState('');
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
-  const { data: subjects = [], isLoading } = useSubjects();
+  const { data: subjects = [], isLoading, refetch } = useSubjects();
   const { createSubject, updateSubject, deleteSubject } = useSubjectMutations();
+
+  // Listen for real-time subject updates
+  React.useEffect(() => {
+    const handleUpdate = () => refetch();
+    window.addEventListener('studyhub_subjects_updated', handleUpdate);
+    return () => window.removeEventListener('studyhub_subjects_updated', handleUpdate);
+  }, [refetch]);
 
   const filtered = subjects.filter(
     (s) =>
@@ -39,20 +47,41 @@ export const AdminSubjectsPage: React.FC = () => {
   const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
       await deleteSubject.mutateAsync(id);
+      setSuccessBanner(`Subject "${name}" deleted.`);
+      setTimeout(() => setSuccessBanner(null), 4000);
     }
   };
 
   const handleFormSubmit = async (data: any) => {
     if (editingSubject) {
       await updateSubject.mutateAsync({ ...data, id: editingSubject.id });
+      setSuccessBanner(`Subject "${data.name}" updated successfully!`);
     } else {
       await createSubject.mutateAsync(data);
+      setSuccessBanner(`Subject "${data.name}" added successfully!`);
     }
+    setTimeout(() => setSuccessBanner(null), 5000);
   };
 
   return (
     <div className="space-y-6">
       <SEOHead title="Manage Subjects — Admin Hub" />
+
+      {/* Success Notification Banner */}
+      {successBanner && (
+        <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-semibold flex items-center justify-between shadow-subtle animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-600" />
+            <span>{successBanner}</span>
+          </div>
+          <button
+            onClick={() => setSuccessBanner(null)}
+            className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

@@ -2,7 +2,7 @@
 // HAMMAD STUDYHUB — SUBJECT FORM MODAL (CREATE / EDIT)
 // ==============================================================================
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,7 +12,7 @@ import { parseGoogleDriveUrl } from '../../lib/googleDrive';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Input, Textarea } from '../common/Input';
-import { FolderCheck, Sparkles } from 'lucide-react';
+import { FolderCheck, Sparkles, AlertCircle } from 'lucide-react';
 
 const subjectSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -45,6 +45,9 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
   onSubmit,
   isLoading = false,
 }) => {
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -68,6 +71,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
   });
 
   useEffect(() => {
+    setFormError(null);
     if (initialData) {
       reset({
         name: initialData.name,
@@ -97,25 +101,40 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         sort_order: 1,
       });
     }
-  }, [initialData, reset]);
+  }, [initialData, reset, isOpen]);
 
   const onFormSubmit = async (data: SubjectFormData) => {
-    const slug = data.slug?.trim() ? slugify(data.slug) : slugify(data.name);
-    let folderId: string | undefined = undefined;
-    if (data.google_drive_folder_url) {
-      const parsed = parseGoogleDriveUrl(data.google_drive_folder_url);
-      if (parsed.folderId) {
-        folderId = parsed.folderId;
-      }
-    }
+    setFormError(null);
+    setIsSubmitting(true);
 
-    await onSubmit({
-      ...data,
-      slug,
-      google_drive_folder_url: data.google_drive_folder_url?.trim() || undefined,
-      google_drive_folder_id: folderId,
-    });
-    onClose();
+    try {
+      const slug = data.slug?.trim() ? slugify(data.slug) : slugify(data.name);
+      let driveUrl = data.google_drive_folder_url?.trim() || '';
+      if (driveUrl && !driveUrl.startsWith('http://') && !driveUrl.startsWith('https://')) {
+        driveUrl = 'https://' + driveUrl;
+      }
+
+      let folderId: string | undefined = undefined;
+      if (driveUrl) {
+        const parsed = parseGoogleDriveUrl(driveUrl);
+        if (parsed.folderId) {
+          folderId = parsed.folderId;
+        }
+      }
+
+      await onSubmit({
+        ...data,
+        slug,
+        google_drive_folder_url: driveUrl || undefined,
+        google_drive_folder_id: folderId,
+      });
+      onClose();
+    } catch (err: any) {
+      console.error('Subject submission error:', err);
+      setFormError(err?.message || 'Failed to save subject. Please check inputs and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -126,6 +145,13 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
       description="Configure subject titles, course codes, branding colors, and teacher attribution."
     >
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
+        {formError && (
+          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <p>{formError}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Subject Name"
@@ -173,7 +199,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
             </label>
           </div>
           <Input
-            type="url"
+            type="text"
             placeholder="https://drive.google.com/drive/folders/1ABC... (Paste your subject folder link)"
             helperText="Once added, whenever anyone uploads notes or PDFs for this subject, it automatically links to this folder. No need to paste a link every time!"
             {...register('google_drive_folder_url')}
