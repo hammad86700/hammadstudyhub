@@ -36,8 +36,11 @@ import {
   PlusCircle,
 } from 'lucide-react';
 import { useAuth, ADMIN_PROFILE } from '../context/AuthContext';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
   getRegisteredStudents,
+  mergeRegisteredStudentsLocally,
+  RegisteredStudentEntry,
   getConversationMessages,
   sendChatMessage,
   publishSharedMaterialToHub,
@@ -65,6 +68,23 @@ export const ChatPage: React.FC = () => {
 
   // Sync students and messages on updates
   useEffect(() => {
+    if (isSupabaseConfigured) {
+      (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('registered_students')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (!error && data) {
+            const merged = mergeRegisteredStudentsLocally(data as RegisteredStudentEntry[]);
+            setAllStudents(merged);
+          }
+        } catch {
+          // ignore
+        }
+      })();
+    }
+
     const handleUpdate = () => {
       setAllStudents(getRegisteredStudents());
       if (profile && selectedContact) {

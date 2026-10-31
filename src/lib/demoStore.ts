@@ -221,6 +221,40 @@ export function findStudentByEmail(email: string): RegisteredStudentEntry | unde
   return students.find((s) => s.email.toLowerCase() === email.trim().toLowerCase());
 }
 
+export function upsertRegisteredStudentLocally(entry: RegisteredStudentEntry): void {
+  const students = getRegisteredStudents();
+  const index = students.findIndex((s) => s.id === entry.id || s.email.toLowerCase() === entry.email.toLowerCase());
+  let updated: RegisteredStudentEntry[];
+  if (index >= 0) {
+    updated = [...students];
+    updated[index] = { ...students[index], ...entry };
+  } else {
+    updated = [entry, ...students];
+  }
+  setStored(STUDENTS_KEY, updated);
+  window.dispatchEvent(new Event('studyhub_students_updated'));
+}
+
+export function mergeRegisteredStudentsLocally(remoteList: RegisteredStudentEntry[]): RegisteredStudentEntry[] {
+  const localList = getRegisteredStudents();
+  const map = new Map<string, RegisteredStudentEntry>();
+  localList.forEach((s) => map.set(s.id, s));
+  remoteList.forEach((s) => {
+    const existing = map.get(s.id) || localList.find((l) => l.email.toLowerCase() === s.email.toLowerCase());
+    if (existing) {
+      map.set(existing.id, { ...existing, ...s });
+    } else {
+      map.set(s.id, s);
+    }
+  });
+  const merged = Array.from(map.values()).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+  setStored(STUDENTS_KEY, merged);
+  window.dispatchEvent(new Event('studyhub_students_updated'));
+  return merged;
+}
+
 export function getActiveCR(): UserProfile | undefined {
   const students = getRegisteredStudents();
   return students.find((s) => s.role === 'cr');

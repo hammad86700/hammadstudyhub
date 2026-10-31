@@ -12,6 +12,7 @@ import {
   findStudentByEmail,
   registerStudent,
   getRegisteredStudents,
+  upsertRegisteredStudentLocally,
 } from '../lib/demoStore';
 
 interface AuthContextType {
@@ -224,62 +225,111 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { profile: ADMIN_PROFILE };
       }
 
+      // 2. If Supabase is configured, check the registered_students table first
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password,
-        });
-
-        if (error) {
-          setIsLoading(false);
-          return { error: error.message };
-        }
-
-        if (data.user) {
-          const { data: profileData } = await supabase
-            .from('profiles')
+        try {
+          const { data: studentRecord, error: tableError } = await supabase
+            .from('registered_students')
             .select('*')
-            .eq('id', data.user.id)
-            .single();
+            .ilike('email', cleanEmail)
+            .maybeSingle();
 
-          const userProf = profileData as UserProfile;
-          setProfile(userProf);
-          setIsLoading(false);
-          return { profile: userProf };
+          if (!tableError && studentRecord) {
+            if (studentRecord.password && studentRecord.password !== password) {
+              setIsLoading(false);
+              return { error: 'Incorrect password. Please verify your password and try again.' };
+            }
+
+            // Student authenticated successfully
+            const { password: _, ...safeProfile } = studentRecord;
+            localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(safeProfile));
+            localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+            upsertRegisteredStudentLocally(studentRecord);
+
+            setUser({
+              id: safeProfile.id,
+              email: safeProfile.email,
+              app_metadata: {},
+              user_metadata: { display_name: safeProfile.display_name },
+              aud: 'authenticated',
+              created_at: safeProfile.created_at,
+            } as User);
+            setProfile(safeProfile as UserProfile);
+            setIsLoading(false);
+            return { profile: safeProfile as UserProfile };
+          }
+        } catch (dbErr) {
+          console.warn('Supabase registered_students query notice:', dbErr);
         }
-      } else {
-        // 2. Check Registered Students / CR / GR in Store
-        const student = findStudentByEmail(cleanEmail);
-        if (student && student.password === password) {
-          const { password: _, ...safeProfile } = student;
-          localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(safeProfile));
-          localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
 
-          setUser({
-            id: safeProfile.id,
-            email: safeProfile.email,
-            app_metadata: {},
-            user_metadata: { display_name: safeProfile.display_name },
-            aud: 'authenticated',
-            created_at: safeProfile.created_at,
-          } as User);
-          setProfile(safeProfile);
-          setIsLoading(false);
-          return { profile: safeProfile };
+        // 3. Try standard Supabase Auth signInWithPassword (safe fallback)
+        try {
+          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password,
+          });
+
+          if (!authError && authData?.user) {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', authData.user.id)
+              .maybeSingle();
+
+            const userProf: UserProfile = (profileData as UserProfile) || {
+              id: authData.user.id,
+              display_name: authData.user.user_metadata?.display_name || cleanEmail.split('@')[0],
+              email: cleanEmail,
+              role: 'student',
+              gender: authData.user.user_metadata?.gender || 'male',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+
+            localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(userProf));
+            localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+            setProfile(userProf);
+            setIsLoading(false);
+            return { profile: userProf };
+          }
+        } catch (authErr) {
+          console.warn('Supabase auth attempt notice:', authErr);
         }
-
-        setIsLoading(false);
-        return {
-          error: 'Invalid email or password. Please verify your credentials or create a student account.',
-        };
       }
+
+      // 4. Local Registered Students Store (Fallback & Offline)
+      const student = findStudentByEmail(cleanEmail);
+      if (student) {
+        if (student.password && student.password !== password) {
+          setIsLoading(false);
+          return { error: 'Incorrect password. Please verify your password and try again.' };
+        }
+
+        const { password: _, ...safeProfile } = student;
+        localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(safeProfile));
+        localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+
+        setUser({
+          id: safeProfile.id,
+          email: safeProfile.email,
+          app_metadata: {},
+          user_metadata: { display_name: safeProfile.display_name },
+          aud: 'authenticated',
+          created_at: safeProfile.created_at,
+        } as User);
+        setProfile(safeProfile);
+        setIsLoading(false);
+        return { profile: safeProfile };
+      }
+
+      setIsLoading(false);
+      return {
+        error: 'No account found with this email. Please check your spelling or click "Sign Up Now" to create an account.',
+      };
     } catch (e: any) {
       setIsLoading(false);
       return { error: e.message || 'An unexpected authentication error occurred.' };
     }
-
-    setIsLoading(false);
-    return { error: 'Unknown authentication error.' };
   };
 
   const signUpStudent = async (
@@ -288,6 +338,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const newProfile = registerStudent(input);
+
+      // Dual-write to Supabase registered_students if configured
+      if (isSupabaseConfigured) {
+        try {
+          const { error: syncError } = await supabase.from('registered_students').upsert({
+            id: newProfile.id,
+            display_name: input.display_name.trim(),
+            email: input.email.trim().toLowerCase(),
+            password: input.password,
+            role: newProfile.role,
+            gender: input.gender,
+            phone: input.phone?.trim() || '',
+            roll_no: input.roll_no?.trim() || '',
+            program_name: input.program_name?.trim() || '',
+            semester: input.semester?.trim() || '',
+            created_at: newProfile.created_at,
+            updated_at: newProfile.updated_at,
+          });
+          if (syncError) {
+            console.warn('Supabase student registration sync notice:', syncError.message);
+          }
+        } catch (syncEx) {
+          console.warn('Supabase student registration sync exception:', syncEx);
+        }
+
+        // Also attempt Supabase Auth signup in background (safe, ignore error if email confirm needed)
+        try {
+          await supabase.auth.signUp({
+            email: input.email.trim().toLowerCase(),
+            password: input.password,
+            options: {
+              data: {
+                display_name: input.display_name.trim(),
+                gender: input.gender,
+                roll_no: input.roll_no?.trim() || '',
+              },
+            },
+          });
+        } catch {
+          // ignore
+        }
+      }
 
       // Auto log in newly registered student
       localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(newProfile));

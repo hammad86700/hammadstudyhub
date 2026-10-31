@@ -9,7 +9,8 @@ import { useSubjects, useSubjectMutations } from '../../hooks/useSubjects';
 import { useResources, useResourceMutations } from '../../hooks/useResources';
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 import { formatLessonDate, formatRelativeTime, getResourceTypeMeta } from '../../lib/utils';
-import { getRegisteredStudents } from '../../lib/demoStore';
+import { getRegisteredStudents, mergeRegisteredStudentsLocally, RegisteredStudentEntry } from '../../lib/demoStore';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { StatsOverview } from '../../components/admin/StatsOverview';
 import { ResourceFormModal } from '../../components/admin/ResourceFormModal';
 import { SubjectFormModal } from '../../components/admin/SubjectFormModal';
@@ -29,6 +30,23 @@ export const AdminDashboardPage: React.FC = () => {
   const [students, setStudents] = useState(() => getRegisteredStudents());
 
   React.useEffect(() => {
+    if (isSupabaseConfigured) {
+      (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('registered_students')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (!error && data) {
+            const merged = mergeRegisteredStudentsLocally(data as RegisteredStudentEntry[]);
+            setStudents(merged);
+          }
+        } catch {
+          // ignore
+        }
+      })();
+    }
+
     const handleUpdate = () => setStudents(getRegisteredStudents());
     window.addEventListener('studyhub_students_updated', handleUpdate);
     return () => window.removeEventListener('studyhub_students_updated', handleUpdate);

@@ -20,12 +20,15 @@ import {
   CheckCircle,
   Filter,
   UserCheck,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   getRegisteredStudents,
   updateStudentRole,
   deleteStudent,
+  mergeRegisteredStudentsLocally,
   RegisteredStudentEntry,
 } from '../../lib/demoStore';
 import { UserRole, Gender } from '../../types';
@@ -38,11 +41,35 @@ import { formatRelativeTime } from '../../lib/utils';
 export const AdminStudentsPage: React.FC = () => {
   const { isAdmin } = useAuth();
   const [students, setStudents] = useState<RegisteredStudentEntry[]>(() => getRegisteredStudents());
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<'all' | Gender>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all');
 
+  const fetchRemoteStudents = async () => {
+    setIsRefreshing(true);
+    let remote: RegisteredStudentEntry[] = [];
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('registered_students')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          remote = data as RegisteredStudentEntry[];
+        }
+      } catch (err) {
+        console.warn('Could not fetch remote students:', err);
+      }
+    }
+    const merged = mergeRegisteredStudentsLocally(remote);
+    setStudents(merged);
+    setIsRefreshing(false);
+  };
+
   useEffect(() => {
+    fetchRemoteStudents();
+
     const handleUpdate = () => {
       setStudents(getRegisteredStudents());
     };
@@ -67,16 +94,36 @@ export const AdminStudentsPage: React.FC = () => {
     );
   }
 
-  const handleRoleChange = (studentId: string, name: string, newRole: 'student' | 'cr' | 'gr') => {
+  const handleRoleChange = async (studentId: string, name: string, newRole: 'student' | 'cr' | 'gr') => {
     const roleLabel = newRole === 'cr' ? 'Class Representative (CR)' : newRole === 'gr' ? 'Girls Representative (GR)' : 'Standard Student';
     if (window.confirm(`Update ${name}'s role to ${roleLabel}?`)) {
       updateStudentRole(studentId, newRole);
+      if (isSupabaseConfigured) {
+        try {
+          await supabase
+            .from('registered_students')
+            .update({ role: newRole, updated_at: new Date().toISOString() })
+            .eq('id', studentId);
+        } catch (e) {
+          console.warn('Remote student role update error:', e);
+        }
+      }
     }
   };
 
-  const handleDelete = (studentId: string, name: string) => {
+  const handleDelete = async (studentId: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete student profile "${name}"?`)) {
       deleteStudent(studentId);
+      if (isSupabaseConfigured) {
+        try {
+          await supabase
+            .from('registered_students')
+            .delete()
+            .eq('id', studentId);
+        } catch (e) {
+          console.warn('Remote student delete error:', e);
+        }
+      }
     }
   };
 
@@ -114,6 +161,16 @@ export const AdminStudentsPage: React.FC = () => {
             View student accounts, phone contacts, academic programs, and appoint Class Representatives (CR & GR).
           </p>
         </div>
+
+        <button
+          onClick={fetchRemoteStudents}
+          disabled={isRefreshing}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-navy-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-navy-800 transition-colors shadow-subtle disabled:opacity-50"
+          title="Refresh students from database"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-brand-600' : ''}`} />
+          <span>{isRefreshing ? 'Syncing...' : 'Refresh Directory'}</span>
+        </button>
       </div>
 
       {/* Summary KPI Cards */}
