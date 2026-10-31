@@ -65,3 +65,4 @@ alter table public.resources
 -- 7. PERFORMANCE INDEXES
 create index if not exists idx_subjects_folder_id on public.subjects(google_drive_folder_id);
 create index if not exists idx_resources_drive_file_id on public.resources(google_drive_file_id);
+
