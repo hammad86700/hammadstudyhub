@@ -94,6 +94,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    // 1. If master admin session is stored locally, restore it immediately
+    if (localStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true') {
+      setUser({
+        id: ADMIN_PROFILE.id,
+        email: ADMIN_PROFILE.email,
+        app_metadata: {},
+        user_metadata: { display_name: ADMIN_PROFILE.display_name },
+        aud: 'authenticated',
+        created_at: ADMIN_PROFILE.created_at,
+      } as User);
+      setProfile(ADMIN_PROFILE);
+      setIsLoading(false);
+      return;
+    }
+
     if (isSupabaseConfigured) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
@@ -111,6 +126,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           fetchSupabaseProfile(session.user.id);
         } else {
+          if (localStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true') {
+            setUser({
+              id: ADMIN_PROFILE.id,
+              email: ADMIN_PROFILE.email,
+              app_metadata: {},
+              user_metadata: { display_name: ADMIN_PROFILE.display_name },
+              aud: 'authenticated',
+              created_at: ADMIN_PROFILE.created_at,
+            } as User);
+            setProfile(ADMIN_PROFILE);
+            setIsLoading(false);
+            return;
+          }
           setProfile(null);
           setIsLoading(false);
         }
@@ -178,6 +206,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanEmail = email.trim().toLowerCase();
 
     try {
+      // 1. Master Administrator Check (Works universally on live and local)
+      if (cleanEmail === 'admin123@gmail.com' && password === 'admin@123') {
+        localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, 'true');
+        localStorage.removeItem(ACTIVE_USER_STORAGE_KEY);
+
+        setUser({
+          id: ADMIN_PROFILE.id,
+          email: ADMIN_PROFILE.email,
+          app_metadata: {},
+          user_metadata: { display_name: ADMIN_PROFILE.display_name },
+          aud: 'authenticated',
+          created_at: ADMIN_PROFILE.created_at,
+        } as User);
+        setProfile(ADMIN_PROFILE);
+        setIsLoading(false);
+        return { profile: ADMIN_PROFILE };
+      }
+
       if (isSupabaseConfigured) {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
@@ -202,24 +248,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { profile: userProf };
         }
       } else {
-        // 1. Check Master Admin Credentials
-        if (cleanEmail === 'admin123@gmail.com' && password === 'admin@123') {
-          localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, 'true');
-          localStorage.removeItem(ACTIVE_USER_STORAGE_KEY);
-
-          setUser({
-            id: ADMIN_PROFILE.id,
-            email: ADMIN_PROFILE.email,
-            app_metadata: {},
-            user_metadata: { display_name: ADMIN_PROFILE.display_name },
-            aud: 'authenticated',
-            created_at: ADMIN_PROFILE.created_at,
-          } as User);
-          setProfile(ADMIN_PROFILE);
-          setIsLoading(false);
-          return { profile: ADMIN_PROFILE };
-        }
-
         // 2. Check Registered Students / CR / GR in Store
         const student = findStudentByEmail(cleanEmail);
         if (student && student.password === password) {

@@ -20,3 +20,4 @@ comment on column public.subjects.google_drive_folder_id is 'Extracted Google Dr
 comment on column public.resources.google_drive_folder_url is 'Inherited or customized Google Drive folder URL for this resource';
 comment on column public.resources.file_name is 'Original file name uploaded from device';
 comment on column public.resources.file_size is 'Formatted file size of uploaded document';
+
