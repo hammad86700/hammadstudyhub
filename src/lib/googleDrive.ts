@@ -37,8 +37,8 @@ export function parseGoogleDriveUrl(url: string): ParsedGoogleDriveResult {
 
   const trimmed = url.trim();
 
-  // 1. Google Drive Folder
-  const folderMatch = trimmed.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/i);
+  // 1. Google Drive Folder: /drive/folders/{id} or /drive/u/0/folders/{id}
+  const folderMatch = trimmed.match(/(?:\/drive\/(?:u\/\d+\/)?)?folders\/([a-zA-Z0-9_-]+)/i);
   if (folderMatch && folderMatch[1]) {
     const folderId = folderMatch[1];
     return {

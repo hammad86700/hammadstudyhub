@@ -132,6 +132,8 @@ export interface Subject {
   is_featured: boolean;
   is_active: boolean;
   sort_order: number;
+  google_drive_folder_url?: string;
+  google_drive_folder_id?: string;
   created_at: string;
   updated_at: string;
 
@@ -154,6 +156,9 @@ export interface Resource {
   source_provider: SourceProvider;
   external_url: string;
   embed_url?: string;
+  google_drive_folder_url?: string;
+  file_name?: string;
+  file_size?: string;
   topic?: string;
   chapter?: string;
   tags: string[];

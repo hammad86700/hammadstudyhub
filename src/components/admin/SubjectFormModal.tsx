@@ -8,9 +8,11 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Subject } from '../../types';
 import { slugify } from '../../lib/utils';
+import { parseGoogleDriveUrl } from '../../lib/googleDrive';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Input, Textarea } from '../common/Input';
+import { FolderCheck, Sparkles } from 'lucide-react';
 
 const subjectSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -18,6 +20,7 @@ const subjectSchema = z.object({
   code: z.string().min(2, 'Course code is required (e.g. CS-101).'),
   description: z.string().optional(),
   instructor: z.string().optional(),
+  google_drive_folder_url: z.string().optional(),
   icon: z.string().default('book-open'),
   color: z.string().default('blue'),
   is_featured: z.boolean().default(false),
@@ -55,6 +58,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
       code: '',
       description: '',
       instructor: '',
+      google_drive_folder_url: '',
       icon: 'book-open',
       color: 'blue',
       is_featured: false,
@@ -71,6 +75,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         code: initialData.code,
         description: initialData.description || '',
         instructor: initialData.instructor || '',
+        google_drive_folder_url: initialData.google_drive_folder_url || '',
         icon: initialData.icon || 'book-open',
         color: initialData.color || 'blue',
         is_featured: initialData.is_featured,
@@ -84,6 +89,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         code: '',
         description: '',
         instructor: '',
+        google_drive_folder_url: '',
         icon: 'book-open',
         color: 'blue',
         is_featured: false,
@@ -95,9 +101,19 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
 
   const onFormSubmit = async (data: SubjectFormData) => {
     const slug = data.slug?.trim() ? slugify(data.slug) : slugify(data.name);
+    let folderId: string | undefined = undefined;
+    if (data.google_drive_folder_url) {
+      const parsed = parseGoogleDriveUrl(data.google_drive_folder_url);
+      if (parsed.folderId) {
+        folderId = parsed.folderId;
+      }
+    }
+
     await onSubmit({
       ...data,
       slug,
+      google_drive_folder_url: data.google_drive_folder_url?.trim() || undefined,
+      google_drive_folder_id: folderId,
     });
     onClose();
   };
@@ -147,6 +163,22 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
           placeholder="Brief syllabus outline and learning goals..."
           {...register('description')}
         />
+
+        {/* Google Drive Subject Folder (Configure Once) */}
+        <div className="p-3.5 rounded-2xl bg-brand-50/60 dark:bg-navy-950/60 border border-brand-200 dark:border-brand-900/60 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <FolderCheck className="w-4 h-4 text-brand-600" />
+            <label className="text-xs font-bold text-brand-900 dark:text-brand-200">
+              Subject Google Drive Folder Link (Configure Once)
+            </label>
+          </div>
+          <Input
+            type="url"
+            placeholder="https://drive.google.com/drive/folders/1ABC... (Paste your subject folder link)"
+            helperText="Once added, whenever anyone uploads notes or PDFs for this subject, it automatically links to this folder. No need to paste a link every time!"
+            {...register('google_drive_folder_url')}
+          />
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>

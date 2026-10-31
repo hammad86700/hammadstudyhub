@@ -20,6 +20,7 @@ import {
   Info,
   Flag,
   MessageCircle,
+  FolderOpen,
 } from 'lucide-react';
 import { Resource } from '../../types';
 import { formatLessonDate, formatRelativeTime, getResourceTypeMeta } from '../../lib/utils';
@@ -117,6 +118,12 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
             {resource.topic && (
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 &bull; {resource.topic}
+              </span>
+            )}
+
+            {resource.file_name && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+                📄 {resource.file_name} {resource.file_size && <span className="text-slate-400 font-normal">({resource.file_size})</span>}
               </span>
             )}
           </div>
@@ -221,6 +228,19 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {(resource.google_drive_folder_url || resource.subject?.google_drive_folder_url) && (
+              <a
+                href={resource.google_drive_folder_url || resource.subject?.google_drive_folder_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors"
+                title="Open Course Google Drive Folder"
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>Drive Folder</span>
+              </a>
+            )}
+
             {driveInfo?.directDownloadUrl && (
               <a
                 href={driveInfo.directDownloadUrl}

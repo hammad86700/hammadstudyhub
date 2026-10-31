@@ -222,7 +222,8 @@ export const AdminResourcesPage: React.FC = () => {
                         {res.title}
                       </span>
                       <span className="text-[11px] text-slate-400 truncate block">
-                        {res.topic ? `${res.topic} &bull; ` : ''}
+                        {res.file_name ? `📁 ${res.file_name} • ` : ''}
+                        {res.topic ? `${res.topic} • ` : ''}
                         {res.chapter || ''}
                       </span>
                     </td>
