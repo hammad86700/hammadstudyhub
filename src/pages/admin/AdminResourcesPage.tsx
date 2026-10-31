@@ -280,11 +280,32 @@ export const AdminResourcesPage: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
                       <a
-                        href={res.external_url}
+                        href={res.file_data || res.google_drive_file_url || res.external_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 inline-block"
-                        title="Open external link"
+                        onClick={(e) => {
+                          const target = res.file_data || res.google_drive_file_url || res.external_url;
+                          if (target?.startsWith('data:')) {
+                            e.preventDefault();
+                            try {
+                              const arr = target.split(',');
+                              const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+                              const bstr = atob(arr[1]);
+                              let n = bstr.length;
+                              const u8arr = new Uint8Array(n);
+                              while (n--) {
+                                u8arr[n] = bstr.charCodeAt(n);
+                              }
+                              const blob = new Blob([u8arr], { type: mime });
+                              const blobUrl = URL.createObjectURL(blob);
+                              window.open(blobUrl, '_blank');
+                            } catch {
+                              window.open(target, '_blank');
+                            }
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 inline-block cursor-pointer"
+                        title="Directly open study material / PDF"
                       >
                         <ExternalLink className="w-4 h-4" />
                       </a>

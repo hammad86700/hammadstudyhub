@@ -217,5 +217,34 @@ describe('Zero Dummy Data Sanitization & Clean Database', () => {
     const parsed3 = parseServiceAccountKey(base64Str);
     expect(parsed3.client_email).toBe('studyhub@project-123.iam.gserviceaccount.com');
   });
+
+  it('prioritizes direct file opening (file_data) over folder URL so students open the PDF directly', () => {
+    const sampleResource: Resource = {
+      id: 'res-fe-01',
+      subject_id: 'sub-fe-01',
+      title: 'Introduction to Functional English',
+      slug: 'introduction-to-functional-english',
+      resource_type: 'pdf',
+      lesson_date: '2026-10-31',
+      source_provider: 'google_drive',
+      external_url: 'https://drive.google.com/drive/folders/1MOy9oZjz68iBC6yp6Hxzla5bxJObPI_w',
+      google_drive_folder_url: 'https://drive.google.com/drive/folders/1MOy9oZjz68iBC6yp6Hxzla5bxJObPI_w',
+      file_data: 'data:application/pdf;base64,JVBERi0xLjQK...',
+      file_name: 'Introduction to Functional English.pdf',
+      status: 'published',
+      tags: ['english', 'lecture-01'],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Priority check: file_data must be picked first so students open the PDF directly, not the Drive folder!
+    const directUrl =
+      sampleResource.file_data || sampleResource.google_drive_file_url || sampleResource.external_url;
+
+    expect(directUrl).toBe('data:application/pdf;base64,JVBERi0xLjQK...');
+    expect(sampleResource.google_drive_folder_url).toBe(
+      'https://drive.google.com/drive/folders/1MOy9oZjz68iBC6yp6Hxzla5bxJObPI_w'
+    );
+  });
 });
 

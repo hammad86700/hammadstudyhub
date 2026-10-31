@@ -86,6 +86,30 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
     setCompleted(isNow);
   };
 
+  const directTargetUrl =
+    resource.file_data || resource.google_drive_file_url || resource.external_url || '';
+
+  const handleDirectClick = (e: React.MouseEvent) => {
+    if (directTargetUrl.startsWith('data:')) {
+      e.preventDefault();
+      try {
+        const arr = directTargetUrl.split(',');
+        const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } catch {
+        window.open(directTargetUrl, '_blank');
+      }
+    }
+  };
+
   const breadcrumbs = [
     { label: 'Subjects', href: '/subjects' },
     ...(resource.subject
@@ -254,10 +278,11 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
             )}
 
             <a
-              href={resource.google_drive_file_url || resource.external_url || resource.file_data}
+              href={directTargetUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white transition-colors shadow-xs"
+              onClick={handleDirectClick}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white transition-colors shadow-xs cursor-pointer"
             >
               <span>{resource.resource_type === 'pdf' ? 'Open PDF File' : 'Open in New Tab'}</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -292,10 +317,11 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
                 Click below to launch this learning resource in your browser or Google Drive.
               </p>
               <a
-                href={resource.google_drive_file_url || resource.external_url || resource.file_data}
+                href={directTargetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold bg-brand-600 hover:bg-brand-700 text-white text-sm shadow-md"
+                onClick={handleDirectClick}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold bg-brand-600 hover:bg-brand-700 text-white text-sm shadow-md cursor-pointer"
               >
                 <span>Launch Document / PDF</span>
                 <ExternalLink className="w-4 h-4" />

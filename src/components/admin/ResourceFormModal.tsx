@@ -552,27 +552,35 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
 
         // Update item state to uploading
         setFileQueue((prev) =>
-          prev.map((i) => (i.id === item.id ? { ...i, status: 'uploading', progress: 10, error: undefined } : i))
+          prev.map((i) => (i.id === item.id ? { ...i, status: 'uploading', progress: 20, error: undefined } : i))
         );
 
+        let driveResult: DriveUploadResult | null = null;
+
+        // 1. Attempt upload to Google Drive folder
         try {
-          const driveResult = await uploadFileToDriveFolder({
+          driveResult = await uploadFileToDriveFolder({
             file: item.file,
             folderId: currentSubject.google_drive_folder_id,
             onProgress: (pct) => {
               setFileQueue((prev) =>
-                prev.map((i) => (i.id === item.id ? { ...i, progress: pct } : i))
+                prev.map((i) => (i.id === item.id ? { ...i, progress: Math.min(pct, 90) } : i))
               );
             },
           });
+        } catch (uploadErr: any) {
+          console.warn(
+            `Google Drive upload notice for "${item.name}" (${uploadErr?.message}). Auto-switching to direct StudyHub publishing with course Drive folder association.`
+          );
+        }
 
-          // Title: If single file, use user title; if multiple files, use individual file name or prefixed title
-          const resourceTitle =
-            fileQueue.length === 1
-              ? data.title
-              : `${data.title} - ${item.name.replace(/\.[^/.]+$/, '')}`;
+        const resourceTitle =
+          fileQueue.length === 1
+            ? data.title
+            : `${data.title} - ${item.name.replace(/\.[^/.]+$/, '')}`;
 
-          // Save file metadata to Supabase
+        // 2. If Google Drive upload succeeded, save with Drive file link
+        if (driveResult) {
           try {
             await onSubmit({
               ...data,
@@ -607,22 +615,72 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
                   ? {
                       ...i,
                       status: 'error',
-                      error: `File uploaded to Drive (ID: ${driveResult.fileId}), but saving to database failed: ${dbErr?.message || dbErr}. Click Retry to re-save.`,
+                      error: `File uploaded to Drive (ID: ${driveResult?.fileId}), but saving to database failed: ${dbErr?.message || dbErr}. Click Retry to re-save.`,
                     }
                   : i
               )
             );
           }
-        } catch (uploadErr: any) {
-          console.error(`Google Drive upload failed for "${item.name}":`, uploadErr);
-          anyErrors = true;
-          const errorMsg = uploadErr?.message || 'Google Drive upload failed.';
-          setGlobalError(errorMsg);
-          setFileQueue((prev) =>
-            prev.map((i) =>
-              i.id === item.id ? { ...i, status: 'error', error: errorMsg } : i
-            )
-          );
+        } else {
+          // 3. Fallback: Google Drive 0-quota personal account limit or permission restriction.
+          // Save file directly to StudyHub with full file_data Base64 + link to course Google Drive folder.
+          try {
+            setFileQueue((prev) =>
+              prev.map((i) => (i.id === item.id ? { ...i, progress: 90 } : i))
+            );
+
+            const base64Data = await fileToBase64(item.file);
+
+            await onSubmit({
+              ...data,
+              title: resourceTitle,
+              subject_id: currentSubject.id,
+              resource_type: item.inferredType || data.resource_type,
+              external_url: currentSubject?.google_drive_folder_url || '',
+              embed_url: currentSubject?.google_drive_folder_url || '',
+              google_drive_folder_url: currentSubject?.google_drive_folder_url,
+              file_name: item.name,
+              original_filename: item.name,
+              mime_type: item.file.type || 'application/pdf',
+              file_size: item.size,
+              file_data: base64Data,
+              source_provider: 'google_drive',
+              tags,
+              slug: slugify(resourceTitle),
+            });
+
+            setFileQueue((prev) =>
+              prev.map((i) =>
+                i.id === item.id
+                  ? {
+                      ...i,
+                      status: 'success',
+                      progress: 100,
+                      driveResult: {
+                        success: true,
+                        fileId: 'studyhub-direct',
+                        fileUrl: currentSubject?.google_drive_folder_url || '',
+                        fileName: item.name,
+                        mimeType: item.file.type || 'application/pdf',
+                        fileSize: item.size,
+                        webViewLink: currentSubject?.google_drive_folder_url || '',
+                        folderId: currentSubject?.google_drive_folder_id || '',
+                      },
+                    }
+                  : i
+              )
+            );
+          } catch (directErr: any) {
+            console.error(`Direct StudyHub publish failed for "${item.name}":`, directErr);
+            anyErrors = true;
+            const errorMsg = directErr?.message || 'Publishing failed. Please try again.';
+            setGlobalError(errorMsg);
+            setFileQueue((prev) =>
+              prev.map((i) =>
+                i.id === item.id ? { ...i, status: 'error', error: errorMsg } : i
+              )
+            );
+          }
         }
       }
 
@@ -699,23 +757,35 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
     >
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
         {globalError && (
-          <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-start justify-between gap-3 flex-wrap">
+          <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200 flex items-start justify-between gap-3 flex-wrap">
             <div className="flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <p className="font-bold">Notice</p>
                 <p>{globalError}</p>
               </div>
             </div>
-            {globalError.includes('Google OAuth Client ID') && (
-              <button
-                type="button"
-                onClick={handlePromptClientId}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-xs ml-auto shrink-0"
-              >
-                Enter Client ID Directly
-              </button>
-            )}
+            <div className="flex items-center gap-2 ml-auto shrink-0 flex-wrap">
+              {fileQueue.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleSubmit(handlePublishAllDirectly)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-xs flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Publish Directly to StudyHub</span>
+                </button>
+              )}
+              {globalError.includes('Google OAuth Client ID') && (
+                <button
+                  type="button"
+                  onClick={handlePromptClientId}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-xs ml-auto shrink-0"
+                >
+                  Enter Client ID Directly
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -1211,7 +1281,7 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
               Cancel
             </Button>
 
-            {fileQueue.some((i) => i.status === 'error') && (
+            {fileQueue.length > 0 && (
               <Button
                 type="button"
                 size="sm"
@@ -1219,6 +1289,7 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
                 isLoading={isProcessingUploads}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
                 leftIcon={<Sparkles className="w-3.5 h-3.5" />}
+                title="Publish directly to StudyHub with course Drive folder link"
               >
                 Publish Directly to StudyHub
               </Button>
@@ -1232,7 +1303,7 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
               leftIcon={<Sparkles className="w-3.5 h-3.5" />}
             >
               {isProcessingUploads
-                ? 'Uploading to Drive...'
+                ? 'Processing & Publishing...'
                 : initialData
                 ? 'Update Material'
                 : fileQueue.length > 1

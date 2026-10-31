@@ -86,7 +86,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
   };
 
   const directUrl =
-    resource.google_drive_file_url || resource.external_url || resource.file_data || '';
+    resource.file_data || resource.google_drive_file_url || resource.external_url || '';
 
   const handleDirectClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -250,6 +250,18 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {resource.google_drive_folder_url && (
+            <a
+              href={resource.google_drive_folder_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-700 dark:text-emerald-300 hover:underline text-xs font-semibold flex items-center gap-1"
+              title="Open Course Google Drive Folder"
+            >
+              <span>📁 Drive</span>
+            </a>
+          )}
+
           <Link
             to={`/resources/${resource.slug || resource.id}`}
             className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-medium"
