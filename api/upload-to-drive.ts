@@ -323,7 +323,7 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
     const multipartRequestBody = Buffer.concat([part1, part2, part3]);
 
     const uploadResponse = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,size,webViewLink,webContentLink',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&supportsTeamDrives=true&fields=id,name,mimeType,size,webViewLink,webContentLink',
       {
         method: 'POST',
         headers: {
@@ -349,9 +349,9 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
         errReason === 'notFound' ||
         errMsg.toLowerCase().includes('file not found')
       ) {
-        let helpfulNotice = `Google Drive folder not found (Folder ID: "${folderId.trim()}").`;
+        let helpfulNotice = `Google Drive Folder Not Shared: Folder ID "${folderId.trim()}" is not accessible by the Service Account.`;
         if (serviceAccountEmail) {
-          helpfulNotice += ` CRITICAL ACTION REQUIRED: Please open your folder in Google Drive, click "Share", and add your Service Account email: "${serviceAccountEmail}" with "Editor" permission so it can save files into this folder.`;
+          helpfulNotice += ` Please open this folder in Google Drive, click "Share", and add "${serviceAccountEmail}" as "Editor". Then click Retry.`;
         }
         return res.status(404).json({
           error: 'DRIVE_FOLDER_NOT_SHARED',
@@ -365,9 +365,9 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
         errReason === 'insufficientFilePermissions' ||
         errMsg.toLowerCase().includes('permission')
       ) {
-        let helpfulNotice = `Permission denied for Google Drive folder ID: "${folderId.trim()}".`;
+        let helpfulNotice = `Google Drive Permission Required for Folder ID "${folderId.trim()}".`;
         if (serviceAccountEmail) {
-          helpfulNotice += ` Please share this Google Drive folder with "${serviceAccountEmail}" as "Editor".`;
+          helpfulNotice += ` The Service Account "${serviceAccountEmail}" does not have Editor permission. Open this folder in Google Drive, click "Share", add this email as "Editor", and click Retry.`;
         }
         return res.status(403).json({
           error: 'DRIVE_FOLDER_PERMISSION_DENIED',

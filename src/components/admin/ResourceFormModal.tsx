@@ -38,6 +38,7 @@ import {
   ShieldAlert,
   Check,
   FileCheck,
+  Copy,
 } from 'lucide-react';
 import { Resource, ResourceType, Subject } from '../../types';
 import { parseGoogleDriveUrl, parseYouTubeUrl, detectSourceProvider } from '../../lib/googleDrive';
@@ -500,9 +501,11 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
         } catch (uploadErr: any) {
           console.error(`Google Drive upload failed for "${item.name}":`, uploadErr);
           anyErrors = true;
+          const errorMsg = uploadErr?.message || 'Google Drive upload failed.';
+          setGlobalError(errorMsg);
           setFileQueue((prev) =>
             prev.map((i) =>
-              i.id === item.id ? { ...i, status: 'error', error: uploadErr?.message || 'Google Drive upload failed.' } : i
+              i.id === item.id ? { ...i, status: 'error', error: errorMsg } : i
             )
           );
         }
@@ -861,9 +864,40 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
 
                       {/* Error Message */}
                       {item.status === 'error' && (
-                        <p className="text-[10px] text-red-600 dark:text-red-400 truncate mt-0.5">
-                          {item.error || 'Upload failed.'}
-                        </p>
+                        <div className="mt-1.5 p-2 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-[11px] text-red-700 dark:text-red-300 space-y-1.5">
+                          <p className="font-semibold leading-snug">
+                            {item.error || 'Upload failed.'}
+                          </p>
+                          <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                            {currentSubject.google_drive_folder_url && (
+                              <a
+                                href={currentSubject.google_drive_folder_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-2xs"
+                              >
+                                <span>Open Folder in Drive</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                            {driveServerStatus?.serviceAccountEmail && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (driveServerStatus.serviceAccountEmail) {
+                                    navigator.clipboard.writeText(driveServerStatus.serviceAccountEmail);
+                                    setCopiedSaEmail(true);
+                                    setTimeout(() => setCopiedSaEmail(false), 2000);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold bg-white dark:bg-navy-900 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-100 transition-colors"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>{copiedSaEmail ? 'Copied Email!' : 'Copy Service Account Email'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       )}
 
                       {/* Success confirmation */}
