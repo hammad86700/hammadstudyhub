@@ -343,6 +343,17 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       const errReason = uploadResult.error?.errors?.[0]?.reason || '';
       const errMsg = uploadResult.error?.message || '';
 
+      // Check specifically for Service Account 0-quota limit on personal Google Drive
+      if (errReason === 'storageQuotaExceeded' || errMsg.toLowerCase().includes('quota') || errMsg.toLowerCase().includes('storage')) {
+        return res.status(403).json({
+          error: 'STORAGE_QUOTA_EXCEEDED',
+          message:
+            'Google Service Account Quota Limit: Google assigns 0 bytes of Drive storage to Service Accounts on personal @gmail.com accounts. Please click "Publish Directly to StudyHub" to publish your study material instantly without Drive limits.',
+          rawError: errMsg,
+          details: uploadResult,
+        });
+      }
+
       // Helpful actionable message if folder was not found or not shared with the service account
       if (
         uploadResponse.status === 404 ||
@@ -351,11 +362,12 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       ) {
         let helpfulNotice = `Google Drive Folder Not Shared: Folder ID "${folderId.trim()}" is not accessible by the Service Account.`;
         if (serviceAccountEmail) {
-          helpfulNotice += ` Please open this folder in Google Drive, click "Share", and add "${serviceAccountEmail}" as "Editor". Then click Retry.`;
+          helpfulNotice += ` Please open this folder in Google Drive, click "Share", and add "${serviceAccountEmail}" as "Editor". Or click "Publish Directly to StudyHub".`;
         }
         return res.status(404).json({
           error: 'DRIVE_FOLDER_NOT_SHARED',
           message: helpfulNotice,
+          rawError: errMsg,
           details: uploadResult,
         });
       }
@@ -365,20 +377,22 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
         errReason === 'insufficientFilePermissions' ||
         errMsg.toLowerCase().includes('permission')
       ) {
-        let helpfulNotice = `Google Drive Permission Required for Folder ID "${folderId.trim()}".`;
+        let helpfulNotice = `Google Drive Permission / Quota Notice for Folder ID "${folderId.trim()}": ${errMsg || 'The user does not have sufficient permissions for this file.'}`;
         if (serviceAccountEmail) {
-          helpfulNotice += ` The Service Account "${serviceAccountEmail}" does not have Editor permission. Open this folder in Google Drive, click "Share", add this email as "Editor", and click Retry.`;
+          helpfulNotice += ` Ensure "${serviceAccountEmail}" has Editor permission, or click "Publish Directly to StudyHub" below to bypass Google personal account limitations.`;
         }
         return res.status(403).json({
           error: 'DRIVE_FOLDER_PERMISSION_DENIED',
           message: helpfulNotice,
+          rawError: errMsg,
           details: uploadResult,
         });
       }
 
       return res.status(uploadResponse.status || 500).json({
         error: 'DRIVE_API_UPLOAD_FAILED',
-        message: uploadResult.error?.message || 'Failed to upload file to Google Drive folder.',
+        message: errMsg || 'Failed to upload file to Google Drive folder.',
+        rawError: errMsg,
         details: uploadResult,
       });
     }

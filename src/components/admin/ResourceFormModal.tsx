@@ -47,6 +47,7 @@ import {
   requestGoogleDriveAuthorization,
   isGoogleDriveClientConnected,
   formatFileSize,
+  fileToBase64,
   getGoogleDriveClientToken,
   getDriveServerStatus,
   DriveServerStatus,
@@ -408,6 +409,120 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
       setFileQueue((prev) =>
         prev.map((i) => (i.id === itemId ? { ...i, status: 'error', error: err?.message || 'Upload failed.' } : i))
       );
+    }
+  };
+
+  // Instant Direct Publish Fallback (Bypasses Google Personal Account 0-Quota Restrictions)
+  const handlePublishDirectlyItem = async (itemId: string, formData: ResourceFormData) => {
+    const item = fileQueue.find((i) => i.id === itemId);
+    if (!item) return;
+
+    setFileQueue((prev) =>
+      prev.map((i) => (i.id === itemId ? { ...i, status: 'uploading', progress: 50, error: undefined } : i))
+    );
+
+    try {
+      const base64Data = await fileToBase64(item.file);
+      const tags = (formData.tags_string || '')
+        .split(',')
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+
+      const resourceTitle =
+        fileQueue.length === 1 && formData.title
+          ? formData.title
+          : item.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+
+      await onSubmit({
+        ...formData,
+        title: resourceTitle,
+        subject_id: currentSubject.id,
+        resource_type: item.inferredType || formData.resource_type,
+        external_url: currentSubject?.google_drive_folder_url || '',
+        embed_url: currentSubject?.google_drive_folder_url || '',
+        google_drive_folder_url: currentSubject?.google_drive_folder_url,
+        file_name: item.name,
+        original_filename: item.name,
+        mime_type: item.file.type || 'application/pdf',
+        file_size: item.size,
+        file_data: base64Data,
+        source_provider: 'google_drive',
+        tags,
+        slug: slugify(resourceTitle),
+      });
+
+      setFileQueue((prev) =>
+        prev.map((i) => (i.id === itemId ? { ...i, status: 'success', progress: 100 } : i))
+      );
+      setGlobalError(null);
+    } catch (err: any) {
+      setFileQueue((prev) =>
+        prev.map((i) => (i.id === itemId ? { ...i, status: 'error', error: err?.message || 'Direct publish failed.' } : i))
+      );
+    }
+  };
+
+  // Publish all queued files directly to StudyHub (Bypasses Google personal Drive 0-quota limit)
+  const handlePublishAllDirectly = async (data: ResourceFormData) => {
+    setIsProcessingUploads(true);
+    setGlobalError(null);
+
+    const tags = (data.tags_string || '')
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+
+    let anyErrors = false;
+
+    for (const item of fileQueue) {
+      if (item.status === 'success') continue;
+
+      setFileQueue((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, status: 'uploading', progress: 50, error: undefined } : i))
+      );
+
+      try {
+        const base64Data = await fileToBase64(item.file);
+        const resourceTitle =
+          fileQueue.length === 1 && data.title
+            ? data.title
+            : `${data.title || 'Study Material'} - ${item.name.replace(/\.[^/.]+$/, '')}`;
+
+        await onSubmit({
+          ...data,
+          title: resourceTitle,
+          subject_id: currentSubject.id,
+          resource_type: item.inferredType || data.resource_type,
+          external_url: currentSubject?.google_drive_folder_url || '',
+          embed_url: currentSubject?.google_drive_folder_url || '',
+          google_drive_folder_url: currentSubject?.google_drive_folder_url,
+          file_name: item.name,
+          original_filename: item.name,
+          mime_type: item.file.type || 'application/pdf',
+          file_size: item.size,
+          file_data: base64Data,
+          source_provider: 'google_drive',
+          tags,
+          slug: slugify(resourceTitle),
+        });
+
+        setFileQueue((prev) =>
+          prev.map((i) => (i.id === item.id ? { ...i, status: 'success', progress: 100 } : i))
+        );
+      } catch (err: any) {
+        anyErrors = true;
+        setFileQueue((prev) =>
+          prev.map((i) => (i.id === item.id ? { ...i, status: 'error', error: err?.message || 'Direct publish failed.' } : i))
+        );
+      }
+    }
+
+    setIsProcessingUploads(false);
+
+    if (!anyErrors) {
+      setTimeout(() => {
+        onClose();
+      }, 1000);
     }
   };
 
@@ -933,14 +1048,26 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
                     )}
 
                     {item.status === 'error' && (
-                      <button
-                        type="button"
-                        onClick={() => handleRetryItem(item.id, watch())}
-                        className="text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 dark:bg-red-950/60 px-2 py-1 rounded-md border border-red-200 dark:border-red-800 flex items-center gap-1"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        <span>Retry</span>
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => handlePublishDirectlyItem(item.id, watch())}
+                          className="text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-md shadow-2xs flex items-center gap-1 transition-colors"
+                          title="Publish directly to Hammad StudyHub (bypasses Google Drive 0-quota limit)"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          <span>Publish Directly</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRetryItem(item.id, watch())}
+                          className="text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 bg-slate-100 dark:bg-navy-950 px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 flex items-center gap-1"
+                          title="Retry uploading to Google Drive"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>Retry Drive</span>
+                        </button>
+                      </div>
                     )}
 
                     {!isProcessingUploads && item.status !== 'success' && (
@@ -1079,10 +1206,24 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
             )}
           </p>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isProcessingUploads}>
               Cancel
             </Button>
+
+            {fileQueue.some((i) => i.status === 'error') && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSubmit(handlePublishAllDirectly)}
+                isLoading={isProcessingUploads}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                leftIcon={<Sparkles className="w-3.5 h-3.5" />}
+              >
+                Publish Directly to StudyHub
+              </Button>
+            )}
+
             <Button
               type="submit"
               size="sm"

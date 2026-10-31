@@ -88,6 +88,28 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
   const directUrl =
     resource.google_drive_file_url || resource.external_url || resource.file_data || '';
 
+  const handleDirectClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (directUrl.startsWith('data:')) {
+      e.preventDefault();
+      try {
+        const arr = directUrl.split(',');
+        const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } catch {
+        window.open(directUrl, '_blank');
+      }
+    }
+  };
+
   const getActionLabel = () => {
     switch (resource.resource_type) {
       case 'pdf':
@@ -165,7 +187,8 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
                 href={directUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none inline-flex items-center gap-1.5 group"
+                onClick={handleDirectClick}
+                className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none inline-flex items-center gap-1.5 group cursor-pointer"
                 title="Directly open study material in new tab"
               >
                 <span>{resource.title}</span>
@@ -239,8 +262,8 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
               href={directUrl}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 transition-colors shadow-xs"
+              onClick={handleDirectClick}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 transition-colors shadow-xs cursor-pointer"
               title="Directly open PDF / Material in new tab"
             >
               <span>{getActionLabel()}</span>
