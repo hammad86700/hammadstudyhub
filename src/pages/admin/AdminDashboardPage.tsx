@@ -12,6 +12,7 @@ import { formatLessonDate, formatRelativeTime, getResourceTypeMeta } from '../..
 import { getRegisteredStudents, mergeRegisteredStudentsLocally, RegisteredStudentEntry } from '../../lib/demoStore';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { StatsOverview } from '../../components/admin/StatsOverview';
+import { StorageOverviewCard } from '../../components/admin/StorageOverviewCard';
 import { ResourceFormModal } from '../../components/admin/ResourceFormModal';
 import { SubjectFormModal } from '../../components/admin/SubjectFormModal';
 import { CsvBulkImportModal } from '../../components/admin/CsvBulkImportModal';
@@ -114,6 +115,13 @@ export const AdminDashboardPage: React.FC = () => {
         onNewResource={() => setResourceModalOpen(true)}
         onNewSubject={() => setSubjectModalOpen(true)}
         onBulkImport={() => setCsvModalOpen(true)}
+      />
+
+      {/* Real-time System Storage Monitor (Used & Available Capacity) */}
+      <StorageOverviewCard
+        resources={resources}
+        subjects={subjects}
+        onUploadClick={() => setResourceModalOpen(true)}
       />
 
       {/* Recent Publishing Activity */}

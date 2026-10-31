@@ -5,8 +5,9 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, FileCheck, FileEdit, Bell, Layers, Plus, Upload, Users } from 'lucide-react';
+import { BookOpen, FileCheck, FileEdit, Bell, Layers, Plus, Upload, Users, HardDrive } from 'lucide-react';
 import { Subject, Resource, Announcement } from '../../types';
+import { calculateStorageMetrics } from '../../lib/storageMetrics';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 
@@ -39,10 +40,12 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
   const assignmentCount = resources.filter((r) => r.resource_type === 'assignment').length;
   const pastPaperCount = resources.filter((r) => r.resource_type === 'past_paper').length;
 
+  const storageMetrics = calculateStorageMetrics(resources, subjects);
+
   return (
     <div className="space-y-6">
       {/* Top Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         <Card className="p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400 flex items-center justify-center shrink-0">
             <BookOpen className="w-5 h-5" />
@@ -100,6 +103,24 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
             </div>
           </Card>
         </Link>
+
+        {/* Cloud Storage Capacity Card */}
+        <Card className="p-4 flex items-center gap-3 border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/20 dark:bg-emerald-950/20">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <HardDrive className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
+              Cloud Storage
+            </span>
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white truncate font-mono">
+              {storageMetrics.formattedUsed} Used
+            </h3>
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium block truncate">
+              {storageMetrics.formattedAvailable} Free
+            </span>
+          </div>
+        </Card>
 
         <Card className="p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-navy-950 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
