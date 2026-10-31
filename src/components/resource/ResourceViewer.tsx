@@ -254,7 +254,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
             )}
 
             <a
-              href={resource.file_data || resource.external_url}
+              href={resource.google_drive_file_url || resource.external_url || resource.file_data}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white transition-colors shadow-xs"
@@ -292,7 +292,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
                 Click below to launch this learning resource in your browser or Google Drive.
               </p>
               <a
-                href={resource.file_data || resource.external_url}
+                href={resource.google_drive_file_url || resource.external_url || resource.file_data}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold bg-brand-600 hover:bg-brand-700 text-white text-sm shadow-md"

@@ -134,6 +134,7 @@ export interface Subject {
   sort_order: number;
   google_drive_folder_url?: string;
   google_drive_folder_id?: string;
+  folder_configured?: boolean;
   created_at: string;
   updated_at: string;
 
@@ -157,7 +158,11 @@ export interface Resource {
   external_url: string;
   embed_url?: string;
   google_drive_folder_url?: string;
+  google_drive_file_id?: string;
+  google_drive_file_url?: string;
   file_name?: string;
+  original_filename?: string;
+  mime_type?: string;
   file_size?: string;
   file_data?: string;
   topic?: string;

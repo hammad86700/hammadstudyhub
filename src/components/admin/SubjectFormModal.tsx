@@ -12,15 +12,16 @@ import { parseGoogleDriveUrl } from '../../lib/googleDrive';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Input, Textarea } from '../common/Input';
-import { FolderCheck, Sparkles, AlertCircle } from 'lucide-react';
+import { FolderCheck, Sparkles, AlertCircle, ShieldAlert } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const subjectSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters.'),
+  name: z.string().min(2, 'Subject name must be at least 2 characters.'),
   slug: z.string().optional(),
-  code: z.string().min(2, 'Course code is required (e.g. CS-101).'),
+  code: z.string().optional(),
   description: z.string().optional(),
   instructor: z.string().optional(),
-  google_drive_folder_url: z.string().optional(),
+  google_drive_folder_url: z.string().min(1, 'Google Drive folder sharing URL is required.'),
   icon: z.string().default('book-open'),
   color: z.string().default('blue'),
   is_featured: z.boolean().default(false),
@@ -45,8 +46,11 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
   onSubmit,
   isLoading = false,
 }) => {
+  const { isAdmin } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isFolderLockedForCR = !isAdmin && Boolean(initialData?.google_drive_folder_url);
 
   const {
     register,
@@ -76,7 +80,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
       reset({
         name: initialData.name,
         slug: initialData.slug,
-        code: initialData.code,
+        code: initialData.code || '',
         description: initialData.description || '',
         instructor: initialData.instructor || '',
         google_drive_folder_url: initialData.google_drive_folder_url || '',
@@ -109,24 +113,46 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
 
     try {
       const slug = data.slug?.trim() ? slugify(data.slug) : slugify(data.name);
+
       let driveUrl = data.google_drive_folder_url?.trim() || '';
-      if (driveUrl && !driveUrl.startsWith('http://') && !driveUrl.startsWith('https://')) {
+      if (!driveUrl) {
+        setFormError('Google Drive Folder URL is required for this subject.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!driveUrl.startsWith('http://') && !driveUrl.startsWith('https://')) {
         driveUrl = 'https://' + driveUrl;
       }
 
-      let folderId: string | undefined = undefined;
-      if (driveUrl) {
-        const parsed = parseGoogleDriveUrl(driveUrl);
-        if (parsed.folderId) {
-          folderId = parsed.folderId;
-        }
+      const parsed = parseGoogleDriveUrl(driveUrl);
+      if (!parsed.isValid || !parsed.folderId) {
+        setFormError(
+          'Invalid Google Drive folder link. Please paste a valid folder sharing URL (e.g. https://drive.google.com/drive/folders/1ABC...). The folder ID could not be detected.'
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      const folderId = parsed.folderId;
+
+      // Auto-generate course code if left empty
+      let courseCode = data.code?.trim() || '';
+      if (!courseCode) {
+        const initials = data.name
+          .split(/\s+/)
+          .map((w) => w[0]?.toUpperCase())
+          .filter(Boolean)
+          .join('');
+        courseCode = initials.length >= 2 ? initials : `${data.name.substring(0, 3).toUpperCase()}-101`;
       }
 
       await onSubmit({
         ...data,
+        code: courseCode,
         slug,
-        google_drive_folder_url: driveUrl || undefined,
+        google_drive_folder_url: driveUrl,
         google_drive_folder_id: folderId,
+        folder_configured: true,
       });
       onClose();
     } catch (err: any) {
@@ -156,14 +182,13 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
           <Input
             label="Subject Name"
             required
-            placeholder="e.g. Computer Programming"
+            placeholder="e.g. Digital Logic Design"
             error={errors.name?.message}
             {...register('name')}
           />
           <Input
-            label="Course Code"
-            required
-            placeholder="e.g. CS-101"
+            label="Course Code (Optional)"
+            placeholder="e.g. DLD-101 (or auto-generated)"
             error={errors.code?.message}
             {...register('code')}
           />
@@ -172,7 +197,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="URL Slug (Optional)"
-            placeholder="computer-programming"
+            placeholder="digital-logic-design"
             helperText="Leave blank to auto-generate from name"
             {...register('slug')}
           />
@@ -184,24 +209,39 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         </div>
 
         <Textarea
-          label="Course Description / Overview"
+          label="Course Description / Overview (Optional)"
           rows={3}
           placeholder="Brief syllabus outline and learning goals..."
           {...register('description')}
         />
 
-        {/* Google Drive Subject Folder (Configure Once) */}
-        <div className="p-3.5 rounded-2xl bg-brand-50/60 dark:bg-navy-950/60 border border-brand-200 dark:border-brand-900/60 space-y-1.5">
-          <div className="flex items-center gap-2">
-            <FolderCheck className="w-4 h-4 text-brand-600" />
-            <label className="text-xs font-bold text-brand-900 dark:text-brand-200">
-              Subject Google Drive Folder Link (Configure Once)
-            </label>
+        {/* Google Drive Subject Folder (Required - Configure Once) */}
+        <div className="p-3.5 rounded-2xl bg-brand-50/60 dark:bg-navy-950/60 border border-brand-200 dark:border-brand-900/60 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FolderCheck className="w-4 h-4 text-brand-600" />
+              <label className="text-xs font-bold text-brand-900 dark:text-brand-200">
+                Google Drive Folder Sharing Link <span className="text-red-500">*</span>
+              </label>
+            </div>
+            {isFolderLockedForCR && (
+              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <ShieldAlert className="w-3 h-3" />
+                <span>Admin Managed</span>
+              </span>
+            )}
           </div>
           <Input
             type="text"
-            placeholder="https://drive.google.com/drive/folders/1ABC... (Paste your subject folder link)"
-            helperText="Once added, whenever anyone uploads notes or PDFs for this subject, it automatically links to this folder. No need to paste a link every time!"
+            required
+            disabled={isFolderLockedForCR}
+            placeholder="https://drive.google.com/drive/folders/1ABC... (Paste Google Drive folder sharing link)"
+            helperText={
+              isFolderLockedForCR
+                ? "This subject is linked to Google Drive. Only the Master Administrator can edit or change this folder link."
+                : "Paste the Google Drive folder link for this subject. All future uploads for this subject will automatically upload directly into this folder!"
+            }
+            error={errors.google_drive_folder_url?.message}
             {...register('google_drive_folder_url')}
           />
         </div>

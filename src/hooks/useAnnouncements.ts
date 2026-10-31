@@ -31,7 +31,13 @@ export function useAnnouncements(options: { includeDrafts?: boolean } = {}) {
 
         const { data, error } = await query;
         if (error) throw new Error(error.message);
-        return (data as Announcement[]) || [];
+        return ((data as Announcement[]) || []).filter(
+          (a) =>
+            !a.id.startsWith('66666666-') &&
+            a.title !== 'Welcome to Hammad StudyHub Fall 2026!' &&
+            a.title !== 'Mid-Term Examination Schedule Announced' &&
+            a.title !== 'CS-101 Programming Lab 02 Submission Deadline'
+        );
       } else {
         let list = getDemoAnnouncements();
         if (!options.includeDrafts) {

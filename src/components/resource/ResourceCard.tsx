@@ -202,7 +202,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
           </Link>
 
           <a
-            href={resource.file_data || resource.external_url}
+            href={resource.google_drive_file_url || resource.external_url || resource.file_data}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}

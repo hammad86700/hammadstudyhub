@@ -42,7 +42,7 @@ export function useSubjects(filters?: SubjectFilters) {
 
           const { data, error } = await query;
           if (!error && data) {
-            subjects = (data as Subject[]) || [];
+            subjects = ((data as Subject[]) || []).filter((s) => !s.id.startsWith('44444444-'));
           } else if (error) {
             console.warn('Supabase subjects fetch notice (using local store):', error.message);
           }

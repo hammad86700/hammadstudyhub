@@ -59,11 +59,28 @@ function setStored<T>(key: string, data: T): void {
   }
 }
 
+function isLegacyDemoId(id?: string): boolean {
+  if (!id || typeof id !== 'string') return false;
+  return (
+    id.startsWith('44444444-') ||
+    id.startsWith('55555555-') ||
+    id.startsWith('66666666-') ||
+    id.startsWith('33333333-') ||
+    id.startsWith('22222222-') ||
+    id.startsWith('11111111-')
+  );
+}
+
 // -----------------------------------------------------------------------------
 // SUBJECTS
 // -----------------------------------------------------------------------------
 export function getDemoSubjects(): Subject[] {
-  return getStoredOrInit<Subject[]>(SUBJECTS_KEY, INITIAL_DEMO_SUBJECTS);
+  const raw = getStoredOrInit<Subject[]>(SUBJECTS_KEY, INITIAL_DEMO_SUBJECTS);
+  const cleaned = raw.filter((s) => !isLegacyDemoId(s.id));
+  if (cleaned.length !== raw.length) {
+    setStored(SUBJECTS_KEY, cleaned);
+  }
+  return cleaned;
 }
 
 export function saveDemoSubject(subject: Subject): Subject {
@@ -89,7 +106,12 @@ export function deleteDemoSubject(id: string): void {
 // RESOURCES
 // -----------------------------------------------------------------------------
 export function getDemoResources(): Resource[] {
-  return getStoredOrInit<Resource[]>(RESOURCES_KEY, INITIAL_DEMO_RESOURCES);
+  const raw = getStoredOrInit<Resource[]>(RESOURCES_KEY, INITIAL_DEMO_RESOURCES);
+  const cleaned = raw.filter((r) => !isLegacyDemoId(r.id) && !isLegacyDemoId(r.subject_id));
+  if (cleaned.length !== raw.length) {
+    setStored(RESOURCES_KEY, cleaned);
+  }
+  return cleaned;
 }
 
 export function saveDemoResource(resource: Resource): Resource {
@@ -115,7 +137,18 @@ export function deleteDemoResource(id: string): void {
 // ANNOUNCEMENTS
 // -----------------------------------------------------------------------------
 export function getDemoAnnouncements(): Announcement[] {
-  return getStoredOrInit<Announcement[]>(ANNOUNCEMENTS_KEY, INITIAL_DEMO_ANNOUNCEMENTS);
+  const raw = getStoredOrInit<Announcement[]>(ANNOUNCEMENTS_KEY, INITIAL_DEMO_ANNOUNCEMENTS);
+  const cleaned = raw.filter(
+    (a) =>
+      !isLegacyDemoId(a.id) &&
+      a.title !== 'Welcome to Hammad StudyHub Fall 2026!' &&
+      a.title !== 'Mid-Term Examination Schedule Announced' &&
+      a.title !== 'CS-101 Programming Lab 02 Submission Deadline'
+  );
+  if (cleaned.length !== raw.length) {
+    setStored(ANNOUNCEMENTS_KEY, cleaned);
+  }
+  return cleaned;
 }
 
 export function saveDemoAnnouncement(announcement: Announcement): Announcement {

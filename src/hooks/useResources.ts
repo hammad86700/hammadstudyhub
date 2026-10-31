@@ -79,7 +79,9 @@ export function useResources(
 
           const { data, error } = await query;
           if (!error && data) {
-            resources = (data as Resource[]) || [];
+            resources = ((data as Resource[]) || []).filter(
+              (r) => !r.id.startsWith('55555555-') && !r.subject_id.startsWith('44444444-')
+            );
           } else if (error) {
             console.warn('Supabase resources fetch notice (using local store):', error.message);
           }
