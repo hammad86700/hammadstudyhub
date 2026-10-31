@@ -159,6 +159,7 @@ export interface Resource {
   google_drive_folder_url?: string;
   file_name?: string;
   file_size?: string;
+  file_data?: string;
   topic?: string;
   chapter?: string;
   tags: string[];

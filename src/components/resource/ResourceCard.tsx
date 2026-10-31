@@ -186,20 +186,33 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
         )}
       </div>
 
-      {/* Footer Info: Lesson Date & Open Action */}
+      {/* Footer Info: Lesson Date & Direct Open Action */}
       <div className="px-4 py-2.5 bg-slate-50/70 dark:bg-navy-950/60 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
         <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium">
           <Calendar className="w-3.5 h-3.5 text-brand-500" />
-          <span>Lesson: {formatLessonDate(resource.lesson_date, { format: 'short' })}</span>
+          <span>{formatLessonDate(resource.lesson_date, { format: 'short' })}</span>
         </div>
 
-        <Link
-          to={`/resources/${resource.slug || resource.id}`}
-          className="font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 flex items-center gap-1 text-xs"
-        >
-          <span>Open</span>
-          <ExternalLink className="w-3 h-3" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/resources/${resource.slug || resource.id}`}
+            className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-medium"
+          >
+            Viewer
+          </Link>
+
+          <a
+            href={resource.file_data || resource.external_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 transition-colors shadow-xs"
+            title="Directly open PDF / Material in new tab"
+          >
+            <span>{resource.resource_type === 'pdf' ? 'Open PDF' : resource.resource_type === 'video' ? 'Watch' : 'Open'}</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
       </div>
     </Card>
   );

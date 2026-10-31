@@ -254,12 +254,12 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
             )}
 
             <a
-              href={resource.external_url}
+              href={resource.file_data || resource.external_url}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white transition-colors shadow-xs"
             >
-              <span>Open in New Tab</span>
+              <span>{resource.resource_type === 'pdf' ? 'Open PDF File' : 'Open in New Tab'}</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
@@ -267,7 +267,13 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
 
         {/* Embed Frame or Media Player */}
         <div className="relative bg-slate-900 min-h-[420px] sm:min-h-[560px] flex items-center justify-center">
-          {resource.embed_url && !iframeError ? (
+          {resource.file_data ? (
+            <iframe
+              src={resource.file_data}
+              title={resource.title}
+              className="w-full h-[520px] sm:h-[680px] border-0 bg-white"
+            />
+          ) : resource.embed_url && !iframeError ? (
             <iframe
               src={resource.embed_url}
               title={resource.title}
@@ -281,17 +287,17 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
               <div className="w-14 h-14 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-brand-400">
                 <FileText className="w-7 h-7" />
               </div>
-              <h4 className="text-lg font-bold">Open Resource via Google Drive</h4>
+              <h4 className="text-lg font-bold">Open Resource Directly</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                This document is securely hosted on Google Drive. If the preview does not display due to your browser privacy settings or Google Drive permissions, open it directly using the button below.
+                Click below to launch this learning resource in your browser or Google Drive.
               </p>
               <a
-                href={resource.external_url}
+                href={resource.file_data || resource.external_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold bg-brand-600 hover:bg-brand-700 text-white text-sm shadow-md"
               >
-                <span>Launch Document on Google Drive</span>
+                <span>Launch Document / PDF</span>
                 <ExternalLink className="w-4 h-4" />
               </a>
             </div>

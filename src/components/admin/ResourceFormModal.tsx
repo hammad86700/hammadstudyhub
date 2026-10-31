@@ -62,6 +62,7 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
   const [driveValidation, setDriveValidation] = useState<any>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [selectedFileSize, setSelectedFileSize] = useState<string | null>(null);
+  const [selectedFileData, setSelectedFileData] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -108,6 +109,7 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
         status: initialData.status,
       });
       setSelectedFileName(initialData.file_name || null);
+      setSelectedFileData(initialData.file_data || null);
     } else {
       reset({
         title: '',
@@ -123,6 +125,7 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
       });
       setSelectedFileName(null);
       setSelectedFileSize(null);
+      setSelectedFileData(null);
     }
   }, [initialData, subjects, reset, isOpen]);
 
@@ -166,6 +169,15 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
         const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
         setValue('title', cleanName);
       }
+
+      // Read file contents as Base64 DataURL (for files up to 20MB)
+      if (file.size < 20 * 1024 * 1024) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setSelectedFileData(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -181,7 +193,11 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
     let embedUrl: string | undefined = undefined;
 
     if (!finalUrl) {
-      if (currentSubject?.google_drive_folder_url) {
+      if (selectedFileData) {
+        finalUrl = selectedFileData;
+        embedUrl = selectedFileData;
+        finalProvider = 'direct_url';
+      } else if (currentSubject?.google_drive_folder_url) {
         finalUrl = currentSubject.google_drive_folder_url;
         if (currentSubject.google_drive_folder_id) {
           embedUrl = `https://drive.google.com/embeddedfolderview?id=${currentSubject.google_drive_folder_id}#list`;
@@ -207,6 +223,7 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
       embed_url: embedUrl,
       file_name: selectedFileName || undefined,
       file_size: selectedFileSize || undefined,
+      file_data: selectedFileData || initialData?.file_data || undefined,
       google_drive_folder_url: currentSubject?.google_drive_folder_url,
       tags,
       slug: slugify(data.title),
