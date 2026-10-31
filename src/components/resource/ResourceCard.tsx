@@ -85,6 +85,26 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
     setCompleted(isNow);
   };
 
+  const directUrl =
+    resource.google_drive_file_url || resource.external_url || resource.file_data || '';
+
+  const getActionLabel = () => {
+    switch (resource.resource_type) {
+      case 'pdf':
+        return 'Open PDF File';
+      case 'presentation':
+        return 'Open Slides';
+      case 'video':
+        return 'Watch Video';
+      case 'past_paper':
+        return 'Open Past Paper';
+      case 'assignment':
+        return 'Open Assignment';
+      default:
+        return 'Open Material';
+    }
+  };
+
   return (
     <Card hover className="overflow-hidden flex flex-col justify-between">
       <div className="p-4 sm:p-5 space-y-3">
@@ -137,15 +157,28 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
           </div>
         </div>
 
-        {/* Resource Title & Details */}
+        {/* Resource Title & Direct Open Link */}
         <div>
           <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
-            <Link
-              to={`/resources/${resource.slug || resource.id}`}
-              className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none"
-            >
-              {resource.title}
-            </Link>
+            {directUrl ? (
+              <a
+                href={directUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none inline-flex items-center gap-1.5 group"
+                title="Directly open study material in new tab"
+              >
+                <span>{resource.title}</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
+              </a>
+            ) : (
+              <Link
+                to={`/resources/${resource.slug || resource.id}`}
+                className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none"
+              >
+                {resource.title}
+              </Link>
+            )}
           </h4>
           {resource.description && (
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
@@ -201,17 +234,19 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
             Viewer
           </Link>
 
-          <a
-            href={resource.google_drive_file_url || resource.external_url || resource.file_data}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 transition-colors shadow-xs"
-            title="Directly open PDF / Material in new tab"
-          >
-            <span>{resource.resource_type === 'pdf' ? 'Open PDF' : resource.resource_type === 'video' ? 'Watch' : 'Open'}</span>
-            <ExternalLink className="w-3 h-3" />
-          </a>
+          {directUrl && (
+            <a
+              href={directUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 transition-colors shadow-xs"
+              title="Directly open PDF / Material in new tab"
+            >
+              <span>{getActionLabel()}</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
         </div>
       </div>
     </Card>

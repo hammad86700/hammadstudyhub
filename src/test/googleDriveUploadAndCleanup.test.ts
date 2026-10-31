@@ -192,5 +192,30 @@ describe('Zero Dummy Data Sanitization & Clean Database', () => {
     expect(subjects[0].name).toBe('Digital Logic Design');
     expect(subjects[0].google_drive_folder_id).toBe('1ABC_DLD');
   });
+
+  it('robustly parses Google Service Account keys formatted with quotes and escaped newlines', async () => {
+    const { parseServiceAccountKey } = await import('../../api/upload-to-drive');
+
+    const sampleRaw = JSON.stringify({
+      type: 'service_account',
+      client_email: 'studyhub@project-123.iam.gserviceaccount.com',
+      private_key: '-----BEGIN PRIVATE KEY-----\\nMIIEvgIBADANBgk...\\n-----END PRIVATE KEY-----\\n',
+    });
+
+    // 1. Raw JSON
+    const parsed1 = parseServiceAccountKey(sampleRaw);
+    expect(parsed1.client_email).toBe('studyhub@project-123.iam.gserviceaccount.com');
+    expect(parsed1.private_key).toContain('-----BEGIN PRIVATE KEY-----');
+    expect(parsed1.private_key).toContain('\n');
+
+    // 2. Wrapped in quotes
+    const parsed2 = parseServiceAccountKey(`"${sampleRaw.replace(/"/g, '\\"')}"`);
+    expect(parsed2.client_email).toBe('studyhub@project-123.iam.gserviceaccount.com');
+
+    // 3. Base64 encoded
+    const base64Str = Buffer.from(sampleRaw).toString('base64');
+    const parsed3 = parseServiceAccountKey(base64Str);
+    expect(parsed3.client_email).toBe('studyhub@project-123.iam.gserviceaccount.com');
+  });
 });
 

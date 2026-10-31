@@ -327,8 +327,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error: 'No account found with this email. Please check your spelling or click "Sign Up Now" to create an account.',
       };
     } catch (e: any) {
+      console.warn('Authentication error:', e);
+      // Attempt local fallback in case network or remote DB threw
+      const student = findStudentByEmail(cleanEmail);
+      if (student) {
+        if (student.password && student.password !== password) {
+          setIsLoading(false);
+          return { error: 'Incorrect password. Please verify your password and try again.' };
+        }
+        const { password: _, ...safeProfile } = student;
+        localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(safeProfile));
+        localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+        setUser({
+          id: safeProfile.id,
+          email: safeProfile.email,
+          app_metadata: {},
+          user_metadata: { display_name: safeProfile.display_name },
+          aud: 'authenticated',
+          created_at: safeProfile.created_at,
+        } as User);
+        setProfile(safeProfile);
+        setIsLoading(false);
+        return { profile: safeProfile };
+      }
+
       setIsLoading(false);
-      return { error: e.message || 'An unexpected authentication error occurred.' };
+      const isTechnicalError =
+        e?.message?.includes('Invalid path') ||
+        e?.message?.includes('fetch') ||
+        e?.message?.includes('Network');
+      return {
+        error: isTechnicalError
+          ? 'Unable to connect to authentication server. Please click "Sign Up Now" to create your student account, or check your internet connection.'
+          : e?.message || 'An unexpected authentication error occurred.',
+      };
     }
   };
 

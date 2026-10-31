@@ -5,8 +5,8 @@
 // Features:
 // 1. Direct upload into the subject's designated Google Drive folder.
 // 2. Dual-mode authorization:
-//    - Preferred: Server-side secure endpoint (/api/upload-to-drive) using Service Account or OAuth
-//    - Client-side: Google Identity Services (GIS) / OAuth 2.0 Token Client (drive.file scope)
+//    - Preferred: Server-side secure endpoint (/api/upload-to-drive) using Service Account
+//    - Alternative: Google Identity Services (GIS) / OAuth 2.0 Token Client (drive.file scope)
 // 3. Strict validation: Never uploads to root My Drive when a subject folder is configured.
 // 4. Zero fake uploads: Returns real file IDs and webViewLinks or reports clear config needs.
 // ==============================================================================
@@ -23,8 +23,42 @@ export interface DriveUploadResult {
   folderId: string;
 }
 
+export interface DriveServerStatus {
+  status: 'ok' | 'error' | 'idle';
+  configured: boolean;
+  method: 'service_account' | 'oauth' | 'none';
+  serviceAccountEmail?: string;
+  projectId?: string;
+  error?: string;
+  message?: string;
+}
+
 const GDRIVE_TOKEN_KEY = 'studyhub_gdrive_access_token';
 const GDRIVE_TOKEN_EXP_KEY = 'studyhub_gdrive_access_token_exp';
+
+/**
+ * Checks server-side Google Drive configuration status (Service Account or OAuth)
+ */
+export async function getDriveServerStatus(): Promise<DriveServerStatus> {
+  try {
+    const res = await fetch('/api/upload-to-drive', {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      return (await res.json()) as DriveServerStatus;
+    }
+    const errData = await res.json().catch(() => null);
+    if (errData) return errData;
+  } catch {
+    // Network or offline
+  }
+  return {
+    status: 'idle',
+    configured: false,
+    method: 'none',
+  };
+}
 
 /**
  * Retrieves valid client-side Google OAuth access token if not expired
@@ -103,7 +137,7 @@ export function formatFileSize(bytes: number): string {
 
 /**
  * Launches official Google Identity Services (GIS) Token Client popup
- * Requests https://www.googleapis.com/auth/drive.file scope (least privileged, safe)
+ * Requests https://www.googleapis.com/auth/drive scope
  */
 export async function requestGoogleDriveAuthorization(clientId?: string): Promise<string> {
   const resolvedClientId =
@@ -122,7 +156,7 @@ export async function requestGoogleDriveAuthorization(clientId?: string): Promis
       return requestGoogleDriveAuthorization(cleanId);
     }
     throw new Error(
-      'Google OAuth Client ID is not configured (VITE_GOOGLE_CLIENT_ID). Please provide a Client ID or configure server-side GOOGLE_SERVICE_ACCOUNT_KEY.'
+      'Google OAuth Client ID is not configured (VITE_GOOGLE_CLIENT_ID). Please provide a Client ID or configure server-side GOOGLE_SERVICE_ACCOUNT_KEY on Vercel.'
     );
   }
 
@@ -150,7 +184,7 @@ export async function requestGoogleDriveAuthorization(clientId?: string): Promis
     try {
       const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
         client_id: resolvedClientId,
-        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive',
+        scope: 'https://www.googleapis.com/auth/drive',
         callback: (response: any) => {
           if (response.error) {
             reject(new Error(response.error_description || response.error || 'Google Drive authorization denied.'));
@@ -197,7 +231,7 @@ export async function uploadFileToDriveFolder(params: {
 
   const clientToken = getGoogleDriveClientToken();
 
-  // 1. Try Serverless API Route (/api/upload-to-drive) first
+  // 1. Try Serverless API Route (/api/upload-to-drive)
   try {
     const serverResponse = await fetch('/api/upload-to-drive', {
       method: 'POST',
@@ -213,46 +247,50 @@ export async function uploadFileToDriveFolder(params: {
       }),
     });
 
-    if (serverResponse.ok) {
-      const result = await serverResponse.json();
-      if (result.success && result.fileId) {
-        onProgress?.(100);
-        return {
-          success: true,
-          fileId: result.fileId,
-          fileUrl: result.webViewLink,
-          webViewLink: result.webViewLink,
-          webContentLink: result.webContentLink,
-          fileName: file.name,
-          mimeType: resolvedMime,
-          fileSize: formattedSize,
-          folderId: cleanFolderId,
-        };
+    const result = await serverResponse.json().catch(() => null);
+
+    if (serverResponse.ok && result?.success && result?.fileId) {
+      onProgress?.(100);
+      return {
+        success: true,
+        fileId: result.fileId,
+        fileUrl: result.webViewLink,
+        webViewLink: result.webViewLink,
+        webContentLink: result.webContentLink,
+        fileName: file.name,
+        mimeType: resolvedMime,
+        fileSize: formattedSize,
+        folderId: cleanFolderId,
+      };
+    }
+
+    // Extract exact diagnostic error message from server
+    if (result?.message || result?.error) {
+      const errText = result.message || result.error;
+      // If we don't have a client OAuth fallback, immediately throw the server error
+      if (!clientToken) {
+        throw new Error(errText);
       }
-    }
-
-    const errorBody = await serverResponse.json().catch(() => null);
-
-    // If server is explicitly not configured and client token is not available, check for direct client upload
-    if (serverResponse.status === 503 && !clientToken) {
+    } else if (serverResponse.status === 413) {
       throw new Error(
-        errorBody?.message ||
-          'Google Drive API credentials are not configured on the server. Please click "Authorize Google Drive" or configure GOOGLE_SERVICE_ACCOUNT_KEY on Vercel.'
+        `File "${file.name}" exceeds the serverless upload limit. Please use files under 4.5MB or compress the file.`
       );
-    }
-
-    // If other server error occurred and we don't have client token, throw error
-    if (!clientToken && errorBody?.message) {
-      throw new Error(errorBody.message);
+    } else if (serverResponse.status === 503 && !clientToken) {
+      throw new Error(
+        'Google Drive API credentials are not configured on the server. Please configure GOOGLE_SERVICE_ACCOUNT_KEY in Vercel environment variables.'
+      );
+    } else if (!clientToken) {
+      throw new Error(`Google Drive upload failed (Server status ${serverResponse.status}).`);
     }
   } catch (serverErr: any) {
-    // If not a network 404 or 503, rethrow unless we can fall back to client token
     if (!clientToken) {
       throw serverErr;
     }
+    // If client token is available, proceed to fallback client upload
+    console.warn('Server upload attempt notice, falling back to client OAuth:', serverErr);
   }
 
-  // 2. Client-side Google Drive v3 REST API direct upload (using OAuth client token)
+  // 2. Client-side Google Drive v3 REST API direct upload (fallback if client token exists)
   if (clientToken) {
     onProgress?.(55);
 
@@ -278,7 +316,7 @@ export async function uploadFileToDriveFolder(params: {
       closeDelimiter;
 
     const directUploadRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,webContentLink',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,size,webViewLink,webContentLink',
       {
         method: 'POST',
         headers: {
@@ -293,7 +331,7 @@ export async function uploadFileToDriveFolder(params: {
     if (!directUploadRes.ok || !directResult.id) {
       if (directUploadRes.status === 401) {
         clearGoogleDriveClientToken();
-        throw new Error('Google Drive authorization has expired. Please re-authorize by clicking "Connect Google Drive".');
+        throw new Error('Google Drive authorization has expired. Please re-authorize by clicking "Authorize Drive".');
       }
       throw new Error(directResult.error?.message || 'Google Drive API upload failed.');
     }
@@ -303,7 +341,7 @@ export async function uploadFileToDriveFolder(params: {
 
     // Set permission to reader (anyone with link)
     try {
-      await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions?supportsAllDrives=true`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${clientToken}`,
@@ -338,7 +376,6 @@ export async function uploadFileToDriveFolder(params: {
   }
 
   throw new Error(
-    'Google Drive authorization required. Please click "Connect Google Drive" or configure server credentials on Vercel.'
+    'Google Drive authorization required. Please configure GOOGLE_SERVICE_ACCOUNT_KEY on Vercel or authorize via Google Account.'
   );
 }
-
