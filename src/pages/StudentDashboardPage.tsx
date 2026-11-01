@@ -52,6 +52,7 @@ import { EmptyState } from '../components/common/EmptyState';
 import { ResourceCard } from '../components/resource/ResourceCard';
 import { NotificationBell } from '../components/common/NotificationBell';
 import { ContactAdminModal } from '../components/common/ContactAdminModal';
+import { DashboardDirectMessaging } from '../components/chat/DashboardDirectMessaging';
 
 export const StudentDashboardPage: React.FC = () => {
   const { profile, signOut, isStudyManager, isAdmin, isCR, isGR } = useAuth();
@@ -373,6 +374,9 @@ export const StudentDashboardPage: React.FC = () => {
             </Link>
           </aside>
         )}
+
+        {/* 3. Direct Class Messaging & Representative Communications (Boys -> CR/Admin, Girls -> CR/GR/Admin, CR <-> GR) */}
+        <DashboardDirectMessaging />
 
         {/* 4. Latest Uploads Section (Newest First) */}
         <section className="space-y-5">

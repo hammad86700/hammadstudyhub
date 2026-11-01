@@ -46,6 +46,26 @@ export const ADMIN_PROFILE: UserProfile = {
   updated_at: '2026-10-30T00:00:00Z',
 };
 
+export const DEFAULT_CR_PROFILE: UserProfile = {
+  id: 'virtual-cr-id',
+  display_name: 'Class Representative (CR)',
+  email: 'cr@hammadstudyhub.com',
+  role: 'cr',
+  gender: 'male',
+  created_at: '2026-10-30T00:00:00Z',
+  updated_at: '2026-10-30T00:00:00Z',
+};
+
+export const DEFAULT_GR_PROFILE: UserProfile = {
+  id: 'virtual-gr-id',
+  display_name: 'Girls Representative (GR)',
+  email: 'gr@hammadstudyhub.com',
+  role: 'gr',
+  gender: 'female',
+  created_at: '2026-10-30T00:00:00Z',
+  updated_at: '2026-10-30T00:00:00Z',
+};
+
 const ACTIVE_USER_STORAGE_KEY = 'studyhub_active_user_v3';
 const ADMIN_AUTH_STORAGE_KEY = 'studyhub_admin_auth_v3';
 

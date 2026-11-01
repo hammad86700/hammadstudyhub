@@ -20,3 +20,4 @@ alter publication supabase_realtime add table public.resources;
 alter publication supabase_realtime add table public.subjects;
 alter publication supabase_realtime add table public.announcements;
 alter publication supabase_realtime add table public.registered_students;
+

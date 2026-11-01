@@ -10,7 +10,7 @@
 // ==============================================================================
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   MessageSquare,
   Send,
@@ -35,7 +35,7 @@ import {
   Copy,
   PlusCircle,
 } from 'lucide-react';
-import { useAuth, ADMIN_PROFILE } from '../context/AuthContext';
+import { useAuth, ADMIN_PROFILE, DEFAULT_CR_PROFILE, DEFAULT_GR_PROFILE } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
   getRegisteredStudents,
@@ -56,6 +56,10 @@ import { broadcastDataChange } from '../lib/realtimeSync';
 
 export const ChatPage: React.FC = () => {
   const { profile, isLoggedIn } = useAuth();
+  const [searchParams] = useSearchParams();
+  const targetRole = searchParams.get('role');
+  const targetId = searchParams.get('to') || searchParams.get('contactId');
+
   const [selectedContact, setSelectedContact] = useState<UserProfile | null>(null);
   const [messageText, setMessageText] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -128,26 +132,8 @@ export const ChatPage: React.FC = () => {
     const grs = allStudents.filter((s) => s.role === 'gr' && s.id !== profile.id);
     const contacts: UserProfile[] = [];
 
-    // Fallback virtual profiles for CR / GR if not appointed yet
-    const crFallback: UserProfile = crs[0] || {
-      id: 'virtual-cr-id',
-      display_name: 'Class Representative (CR)',
-      email: 'cr@hammadstudyhub.com',
-      role: 'cr',
-      gender: 'male',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    const grFallback: UserProfile = grs[0] || {
-      id: 'virtual-gr-id',
-      display_name: 'Girls Representative (GR)',
-      email: 'gr@hammadstudyhub.com',
-      role: 'gr',
-      gender: 'female',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const crFallback: UserProfile = crs[0] || DEFAULT_CR_PROFILE;
+    const grFallback: UserProfile = grs[0] || DEFAULT_GR_PROFILE;
 
     // 1. Male Student Rule: Only CR and Admin
     if (profile.role === 'student' && profile.gender === 'male') {
@@ -210,12 +196,28 @@ export const ChatPage: React.FC = () => {
     return contacts;
   }, [profile, allStudents]);
 
-  // Set default contact
+  // Set selected contact based on searchParams or default
   useEffect(() => {
-    if (allowedContacts.length > 0 && !selectedContact) {
-      setSelectedContact(allowedContacts[0]);
+    if (allowedContacts.length > 0) {
+      if (targetRole) {
+        const found = allowedContacts.find((c) => c.role === targetRole.toLowerCase());
+        if (found) {
+          setSelectedContact(found);
+          return;
+        }
+      }
+      if (targetId) {
+        const found = allowedContacts.find((c) => c.id === targetId);
+        if (found) {
+          setSelectedContact(found);
+          return;
+        }
+      }
+      if (!selectedContact) {
+        setSelectedContact(allowedContacts[0]);
+      }
     }
-  }, [allowedContacts, selectedContact]);
+  }, [allowedContacts, targetRole, targetId]);
 
   // Collect all shared material attachments in the current conversation
   const sharedMaterialsInConversation = useMemo<SharedMaterialAttachment[]>(() => {
