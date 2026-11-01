@@ -13,7 +13,12 @@ import {
   getRegisteredStudents,
   saveDemoSubject,
   saveDemoResource,
+  deleteDemoResource,
+  deleteDemoSubject,
+  deleteStudent,
   upsertRegisteredStudentLocally,
+  isTombstoned,
+  getTombstones,
 } from '../lib/demoStore';
 import { calculateStorageMetrics } from '../lib/storageMetrics';
 import { Subject, Resource } from '../types';
@@ -241,5 +246,117 @@ describe('Cross-Device Real-Time Cloud Synchronization & Data Reconciliation', (
     expect(responseData?.success).toBe(true);
     expect(responseData?.snapshot?.subjects?.some((s: any) => s.id === 'sync-test-sub-1')).toBe(true);
     expect(responseData?.snapshot?.resources?.some((r: any) => r.id === 'sync-test-res-1')).toBe(true);
+  });
+
+  it('5. Permanently deletes resources across all devices using tombstones and prevents resurrection during sync', () => {
+    // 1. Create a study resource
+    const sampleResource: Resource = {
+      id: 'res-perm-delete-test',
+      subject_id: 'subj-english',
+      title: 'Permanent Deletion Test PDF',
+      slug: 'permanent-deletion-test-pdf',
+      resource_type: 'pdf',
+      lesson_date: '2026-11-01',
+      status: 'published',
+      file_name: 'test.pdf',
+      file_size: '1.2 MB',
+      mime_type: 'application/pdf',
+      source_provider: 'supabase_storage',
+      external_url: '',
+      tags: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    saveDemoResource(sampleResource);
+    expect(getDemoResources().some((r) => r.id === 'res-perm-delete-test')).toBe(true);
+
+    // 2. Admin permanently deletes the resource
+    deleteDemoResource('res-perm-delete-test');
+
+    // 3. Verify it is removed from local store and tombstoned
+    expect(getDemoResources().some((r) => r.id === 'res-perm-delete-test')).toBe(false);
+    expect(isTombstoned('res-perm-delete-test')).toBe(true);
+
+    // 4. Simulate an offline device sending the old deleted resource during sync
+    const merged = mergeResourcesLocally([sampleResource]);
+
+    // 5. Must NOT resurrect the deleted resource
+    expect(merged.some((r) => r.id === 'res-perm-delete-test')).toBe(false);
+    expect(getDemoResources().some((r) => r.id === 'res-perm-delete-test')).toBe(false);
+  });
+
+  it('6. Deleting a subject cascades permanent deletions to all associated resources and wipes storage', () => {
+    const parentSubject: Subject = {
+      id: 'subj-cascade-parent',
+      name: 'Calculus & Analytical Geometry',
+      slug: 'calculus-analytical-geometry',
+      code: 'MATH-101',
+      description: 'Mathematics coursework',
+      icon: 'BookOpen',
+      color: 'blue',
+      is_featured: true,
+      is_active: true,
+      sort_order: 3,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const childResource1: Resource = {
+      id: 'res-calc-ch1',
+      subject_id: 'subj-cascade-parent',
+      title: 'Calculus Chapter 1 Derivatives',
+      slug: 'calculus-ch1-derivatives',
+      resource_type: 'pdf',
+      lesson_date: '2026-11-01',
+      status: 'published',
+      file_name: 'Derivatives.pdf',
+      file_size: '2.0 MB',
+      mime_type: 'application/pdf',
+      source_provider: 'supabase_storage',
+      external_url: '',
+      tags: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const childResource2: Resource = {
+      id: 'res-calc-ch2',
+      subject_id: 'subj-cascade-parent',
+      title: 'Calculus Chapter 2 Integrals',
+      slug: 'calculus-ch2-integrals',
+      resource_type: 'pdf',
+      lesson_date: '2026-11-01',
+      status: 'published',
+      file_name: 'Integrals.pdf',
+      file_size: '3.0 MB',
+      mime_type: 'application/pdf',
+      source_provider: 'supabase_storage',
+      external_url: '',
+      tags: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    saveDemoSubject(parentSubject);
+    saveDemoResource(childResource1);
+    saveDemoResource(childResource2);
+
+    expect(getDemoSubjects().some((s) => s.id === 'subj-cascade-parent')).toBe(true);
+    expect(getDemoResources().filter((r) => r.subject_id === 'subj-cascade-parent').length).toBe(2);
+
+    // Admin permanently deletes the parent subject
+    deleteDemoSubject('subj-cascade-parent');
+
+    // Both parent subject and all its children must be permanently deleted and tombstoned
+    expect(getDemoSubjects().some((s) => s.id === 'subj-cascade-parent')).toBe(false);
+    expect(isTombstoned('subj-cascade-parent')).toBe(true);
+    expect(getDemoResources().filter((r) => r.subject_id === 'subj-cascade-parent').length).toBe(0);
+    expect(isTombstoned('res-calc-ch1')).toBe(true);
+    expect(isTombstoned('res-calc-ch2')).toBe(true);
+
+    // Storage metrics should reflect 0 files for this subject
+    const metrics = calculateStorageMetrics(getDemoResources(), getDemoSubjects());
+    expect(metrics.totalFilesCount).toBe(0);
   });
 });

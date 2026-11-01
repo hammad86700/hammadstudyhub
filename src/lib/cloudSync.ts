@@ -24,7 +24,14 @@ import {
   mergeAnnouncementsLocally,
   mergeRegisteredStudentsLocally,
   mergeChatsLocally,
+  getTombstones,
+  recordTombstone,
+  deleteDemoResource,
+  deleteDemoSubject,
+  deleteStudent,
+  deleteDemoAnnouncement,
 } from './demoStore';
+import { deleteResourceFileData } from './fileStorage';
 import { DEVICE_ID } from './realtimeSync';
 
 const NTFY_TOPIC = 'hammadstudyhub_global_sync_v2';
@@ -74,11 +81,31 @@ export function ingestCloudSnapshot(
     students?: any[];
     announcements?: any[];
     chats?: any[];
+    deleted_ids?: Record<string, { entity: string; deleted_at: string }>;
   },
   queryClient?: QueryClient | null
 ): void {
   if (!snapshot) return;
 
+  // 1. Process permanent deletions first across all devices
+  if (snapshot.deleted_ids && typeof snapshot.deleted_ids === 'object') {
+    for (const [delId, delMeta] of Object.entries(snapshot.deleted_ids)) {
+      const entity = (delMeta as any)?.entity;
+      recordTombstone(delId, entity || 'resources');
+      if (entity === 'resources') {
+        deleteDemoResource(delId);
+        deleteResourceFileData(delId).catch(() => {});
+      } else if (entity === 'subjects') {
+        deleteDemoSubject(delId);
+      } else if (entity === 'students') {
+        deleteStudent(delId);
+      } else if (entity === 'announcements') {
+        deleteDemoAnnouncement(delId);
+      }
+    }
+  }
+
+  // 2. Ingest active items
   if (Array.isArray(snapshot.subjects) && snapshot.subjects.length > 0) {
     mergeSubjectsLocally(snapshot.subjects);
   }
@@ -104,7 +131,7 @@ export function ingestCloudSnapshot(
 
 /**
  * Executes a full two-way cloud synchronization:
- * 1. Gathers local subjects, resources, students, announcements.
+ * 1. Gathers local subjects, resources, students, announcements, and tombstones.
  * 2. Uploads them to /api/sync to merge with central cloud store.
  * 3. Ingests merged snapshot back into local IndexedDB and localStorage.
  */
@@ -131,6 +158,13 @@ export async function syncWithCloud(queryClient?: QueryClient | null): Promise<v
     const localAnnouncements = getDemoAnnouncements();
     const localChats = getAllChatMessages().slice(-30);
 
+    // Collect local tombstones to ensure deleted records are never resurrected
+    const tombstones = getTombstones();
+    const deleted_ids_map: Record<string, { entity: string; deleted_at: string }> = {};
+    tombstones.forEach((t) => {
+      deleted_ids_map[t.id] = { entity: t.entity, deleted_at: t.deleted_at };
+    });
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
@@ -145,6 +179,7 @@ export async function syncWithCloud(queryClient?: QueryClient | null): Promise<v
         students: localStudents,
         announcements: localAnnouncements,
         chats: localChats,
+        deleted_ids: deleted_ids_map,
       }),
       signal: controller.signal,
     });
@@ -212,6 +247,21 @@ export async function pushMutationToCloud(
 ): Promise<void> {
   const targetId = id || data?.id;
 
+  // If deletion, record tombstone locally immediately
+  if (mutationAction === 'delete' && targetId) {
+    recordTombstone(targetId, entity as any);
+    if (entity === 'resources') {
+      deleteDemoResource(targetId);
+      deleteResourceFileData(targetId).catch(() => {});
+    } else if (entity === 'subjects') {
+      deleteDemoSubject(targetId);
+    } else if (entity === 'students') {
+      deleteStudent(targetId);
+    } else if (entity === 'announcements') {
+      deleteDemoAnnouncement(targetId);
+    }
+  }
+
   // 1. Post to /api/sync
   try {
     fetch(API_SYNC_URL, {
@@ -232,6 +282,7 @@ export async function pushMutationToCloud(
 
   // 2. Broadcast via ntfy.sh WebSocket pipe
   try {
+    const isDelete = mutationAction === 'delete';
     const safeData = data?.file_data && data.file_data.length > 500000
       ? { ...data, file_data: undefined }
       : data;
@@ -240,11 +291,11 @@ export async function pushMutationToCloud(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Title: 'StudyHub Sync Mutation',
+        Title: isDelete ? 'Permanent StudyHub Deletion' : 'StudyHub Sync Mutation',
         Priority: 'high',
       },
       body: JSON.stringify({
-        event: 'MUTATION',
+        event: isDelete ? 'PERMANENT_DELETE' : 'MUTATION',
         senderDeviceId: DEVICE_ID,
         entity,
         action: mutationAction,
@@ -301,34 +352,54 @@ export function initCloudSync(queryClient: QueryClient): () => void {
 
           if (parsed.event === 'SYNC_SNAPSHOT' && parsed.payload) {
             ingestCloudSnapshot(parsed.payload, queryClient);
+          } else if (parsed.event === 'PERMANENT_DELETE' || (parsed.event === 'MUTATION' && parsed.action === 'delete')) {
+            const { entity, id, deleted_ids } = parsed;
+            if (id) {
+              recordTombstone(id, entity || 'resources');
+              if (entity === 'resources') {
+                deleteDemoResource(id);
+                deleteResourceFileData(id).catch(() => {});
+              } else if (entity === 'subjects') {
+                deleteDemoSubject(id);
+              } else if (entity === 'students') {
+                deleteStudent(id);
+              } else if (entity === 'announcements') {
+                deleteDemoAnnouncement(id);
+              }
+            }
+            if (deleted_ids && typeof deleted_ids === 'object') {
+              for (const [delId, delMeta] of Object.entries(deleted_ids)) {
+                const ent = (delMeta as any)?.entity;
+                recordTombstone(delId, ent || 'resources');
+                if (ent === 'resources') {
+                  deleteDemoResource(delId);
+                  deleteResourceFileData(delId).catch(() => {});
+                } else if (ent === 'subjects') {
+                  deleteDemoSubject(delId);
+                } else if (ent === 'students') {
+                  deleteStudent(delId);
+                } else if (ent === 'announcements') {
+                  deleteDemoAnnouncement(delId);
+                }
+              }
+            }
+            invalidateLocalEntities(queryClient);
           } else if (parsed.event === 'MUTATION' || parsed.entity) {
             const { entity, action, data, id } = parsed;
             if (entity === 'resources') {
-              if (action === 'delete') {
-                const list = getDemoResources().filter((r) => r.id !== id);
-                mergeResourcesLocally(list);
-              } else if (data) {
+              if (data) {
                 mergeResourcesLocally([data]);
               }
             } else if (entity === 'subjects') {
-              if (action === 'delete') {
-                const list = getDemoSubjects().filter((s) => s.id !== id);
-                mergeSubjectsLocally(list);
-              } else if (data) {
+              if (data) {
                 mergeSubjectsLocally([data]);
               }
             } else if (entity === 'students') {
-              if (action === 'delete') {
-                const list = getRegisteredStudents().filter((s) => s.id !== id);
-                mergeRegisteredStudentsLocally(list);
-              } else if (data) {
+              if (data) {
                 mergeRegisteredStudentsLocally([data]);
               }
             } else if (entity === 'announcements') {
-              if (action === 'delete') {
-                const list = getDemoAnnouncements().filter((a) => a.id !== id);
-                mergeAnnouncementsLocally(list);
-              } else if (data) {
+              if (data) {
                 mergeAnnouncementsLocally([data]);
               }
             } else if (entity === 'chat' && data) {
@@ -410,3 +481,4 @@ export function initCloudSync(queryClient: QueryClient): () => void {
     }
   };
 }
+

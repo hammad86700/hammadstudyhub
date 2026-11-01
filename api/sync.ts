@@ -5,10 +5,11 @@
 //
 // Key Responsibilities:
 // 1. Central Single-Source-of-Truth across Mobile, Laptop, Tablet, CR, GR, and Admin.
-// 2. Conflict-Free Merging (CRDT-inspired): Merges records by unique ID and latest timestamp.
-// 3. Real-time PubSub Event Notification via ntfy.sh WebSocket / SSE bus.
-// 4. In-Memory Persistence with Cold-Start Recovery.
-// 5. Zero-Configuration: Works automatically out-of-the-box without requiring external database keys.
+// 2. Permanent Deletions & Tombstone Registry: When Admin deletes any material,
+//    subject, student, or announcement, it is permanently purged across all devices.
+// 3. Conflict-Free Merging (CRDT-inspired): Merges records by unique ID and latest timestamp.
+// 4. Real-time PubSub Event Notification via ntfy.sh WebSocket / SSE bus.
+// 5. In-Memory Persistence with Cold-Start Recovery.
 // ==============================================================================
 
 interface VercelRequestLike {
@@ -33,6 +34,7 @@ export interface SyncStoreState {
   students: any[];
   announcements: any[];
   chats: any[];
+  deleted_ids: Record<string, { entity: string; deleted_at: string }>;
   updated_at: string;
 }
 
@@ -53,6 +55,7 @@ function getInitialStore(): SyncStoreState {
       students: [],
       announcements: [],
       chats: [],
+      deleted_ids: {},
       updated_at: new Date().toISOString(),
     };
   }
@@ -188,8 +191,11 @@ async function attemptColdStartRecovery(store: SyncStoreState): Promise<void> {
         try {
           const entry = JSON.parse(line);
           const parsedMsg = typeof entry.message === 'string' ? JSON.parse(entry.message) : entry.message;
-          if (parsedMsg?.payload?.subjects || parsedMsg?.payload?.resources) {
+          if (parsedMsg?.payload) {
             const p = parsedMsg.payload;
+            if (p.deleted_ids && typeof p.deleted_ids === 'object') {
+              Object.assign(store.deleted_ids, p.deleted_ids);
+            }
             if (Array.isArray(p.subjects)) {
               store.subjects = mergeRecords(store.subjects, p.subjects);
             }
@@ -230,6 +236,12 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
   try {
     if (req.method === 'GET') {
+      // Purge any tombstoned records before responding
+      store.subjects = store.subjects.filter((s) => !store.deleted_ids[s.id]);
+      store.resources = store.resources.filter((r) => !store.deleted_ids[r.id] && !store.deleted_ids[r.subject_id]);
+      store.students = store.students.filter((st) => !store.deleted_ids[st.id]);
+      store.announcements = store.announcements.filter((a) => !store.deleted_ids[a.id]);
+
       return res.status(200).json({
         success: true,
         timestamp: store.updated_at,
@@ -242,31 +254,52 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       const action = body.action || 'sync';
 
       if (action === 'sync' || action === 'merge') {
-        const { subjects, resources, students, announcements, chats } = body;
+        const { subjects, resources, students, announcements, chats, deleted_ids } = body;
 
         let hasNewData = false;
 
+        // Ingest incoming tombstones from client
+        if (deleted_ids && typeof deleted_ids === 'object') {
+          Object.assign(store.deleted_ids, deleted_ids);
+        }
+
+        // Purge existing records that match any known tombstones
+        store.subjects = store.subjects.filter((s) => !store.deleted_ids[s.id]);
+        store.resources = store.resources.filter((r) => !store.deleted_ids[r.id] && !store.deleted_ids[r.subject_id]);
+        store.students = store.students.filter((st) => !store.deleted_ids[st.id]);
+        store.announcements = store.announcements.filter((a) => !store.deleted_ids[a.id]);
+
+        // Merge incoming subjects (excluding tombstoned subjects)
         if (Array.isArray(subjects) && subjects.length > 0) {
+          const validSubjects = subjects.filter((s: any) => s && s.id && !store.deleted_ids[s.id]);
           const before = store.subjects.length;
-          store.subjects = mergeRecords(store.subjects, subjects, (s) => s.slug || s.code);
+          store.subjects = mergeRecords(store.subjects, validSubjects, (s) => s.slug || s.code);
           if (store.subjects.length !== before) hasNewData = true;
         }
 
+        // Merge incoming resources (excluding tombstoned resources or resources of tombstoned subjects)
         if (Array.isArray(resources) && resources.length > 0) {
+          const validResources = resources.filter(
+            (r: any) => r && r.id && !store.deleted_ids[r.id] && !store.deleted_ids[r.subject_id]
+          );
           const before = store.resources.length;
-          store.resources = mergeRecords(store.resources, resources, (r) => `${r.title}__${r.subject_id}`);
+          store.resources = mergeRecords(store.resources, validResources, (r) => `${r.title}__${r.subject_id}`);
           if (store.resources.length !== before) hasNewData = true;
         }
 
+        // Merge incoming students (excluding tombstoned students)
         if (Array.isArray(students) && students.length > 0) {
+          const validStudents = students.filter((st: any) => st && st.id && !store.deleted_ids[st.id]);
           const before = store.students.length;
-          store.students = mergeRecords(store.students, students, (st) => st.email);
+          store.students = mergeRecords(store.students, validStudents, (st) => st.email);
           if (store.students.length !== before) hasNewData = true;
         }
 
+        // Merge incoming announcements (excluding tombstoned announcements)
         if (Array.isArray(announcements) && announcements.length > 0) {
+          const validAnnouncements = announcements.filter((a: any) => a && a.id && !store.deleted_ids[a.id]);
           const before = store.announcements.length;
-          store.announcements = mergeRecords(store.announcements, announcements);
+          store.announcements = mergeRecords(store.announcements, validAnnouncements);
           if (store.announcements.length !== before) hasNewData = true;
         }
 
@@ -292,34 +325,51 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
         const { entity, mutationAction, data, id } = body;
         const targetId = id || data?.id;
 
-        if (entity === 'resources') {
-          if (mutationAction === 'delete' && targetId) {
+        if (mutationAction === 'delete' && targetId) {
+          // Record permanent tombstone in deletion registry
+          store.deleted_ids[targetId] = { entity, deleted_at: new Date().toISOString() };
+
+          if (entity === 'resources') {
             store.resources = store.resources.filter((r) => r.id !== targetId);
-          } else if (data) {
-            store.resources = mergeRecords(store.resources, [data]);
-          }
-        } else if (entity === 'subjects') {
-          if (mutationAction === 'delete' && targetId) {
+          } else if (entity === 'subjects') {
             store.subjects = store.subjects.filter((s) => s.id !== targetId);
-          } else if (data) {
-            store.subjects = mergeRecords(store.subjects, [data]);
-          }
-        } else if (entity === 'students') {
-          if (mutationAction === 'delete' && targetId) {
+            // Cascading permanent delete: all resources under this subject
+            const related = store.resources.filter((r) => r.subject_id === targetId);
+            related.forEach((r) => {
+              store.deleted_ids[r.id] = { entity: 'resources', deleted_at: new Date().toISOString() };
+            });
+            store.resources = store.resources.filter((r) => r.subject_id !== targetId);
+          } else if (entity === 'students') {
             store.students = store.students.filter((st) => st.id !== targetId);
-          } else if (data) {
-            store.students = mergeRecords(store.students, [data], (st) => st.email);
-          }
-        } else if (entity === 'announcements') {
-          if (mutationAction === 'delete' && targetId) {
+          } else if (entity === 'announcements') {
             store.announcements = store.announcements.filter((a) => a.id !== targetId);
-          } else if (data) {
-            store.announcements = mergeRecords(store.announcements, [data]);
           }
-        } else if (entity === 'chat') {
-          if (data) {
-            store.chats = mergeRecords(store.chats, [data]);
-          }
+
+          store.updated_at = new Date().toISOString();
+          notifyClientsViaPubSub('PERMANENT_DELETE', {
+            entity,
+            id: targetId,
+            deleted_ids: store.deleted_ids,
+          }).catch(() => {});
+
+          return res.status(200).json({
+            success: true,
+            timestamp: store.updated_at,
+            snapshot: store,
+          });
+        }
+
+        // Create / Update mutations
+        if (entity === 'resources' && data && !store.deleted_ids[targetId]) {
+          store.resources = mergeRecords(store.resources, [data]);
+        } else if (entity === 'subjects' && data && !store.deleted_ids[targetId]) {
+          store.subjects = mergeRecords(store.subjects, [data]);
+        } else if (entity === 'students' && data && !store.deleted_ids[targetId]) {
+          store.students = mergeRecords(store.students, [data], (st) => st.email);
+        } else if (entity === 'announcements' && data && !store.deleted_ids[targetId]) {
+          store.announcements = mergeRecords(store.announcements, [data]);
+        } else if (entity === 'chat' && data) {
+          store.chats = mergeRecords(store.chats, [data]);
         }
 
         store.updated_at = new Date().toISOString();

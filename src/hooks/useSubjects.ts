@@ -268,12 +268,13 @@ export function useSubjectMutations() {
 
   const deleteSubject = useMutation({
     mutationFn: async (id: string) => {
-      // 1. Delete from local store
+      // 1. Delete from local store (permanently cascades deletion to all subject resources)
       deleteDemoSubject(id);
 
-      // 2. Delete from Supabase if configured
+      // 2. Delete from Supabase if configured (cascade delete resources first)
       if (isSupabaseConfigured) {
         try {
+          await supabase.from('resources').delete().eq('subject_id', id);
           await supabase.from('subjects').delete().eq('id', id);
         } catch (e: any) {
           console.warn('Supabase delete exception:', e?.message);
@@ -283,6 +284,7 @@ export function useSubjectMutations() {
     },
     onSuccess: (deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
       broadcastDataChange('subjects', 'delete', deletedId);
     },
   });

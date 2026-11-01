@@ -34,6 +34,46 @@ const FEEDBACK_KEY = 'studyhub_feedback_clean';
 const STUDENTS_KEY = 'studyhub_students_v3';
 const SOCIALS_KEY = 'studyhub_socials_v3';
 const CHATS_KEY = 'studyhub_chats_v3';
+const TOMBSTONES_KEY = 'studyhub_deleted_tombstones_v1';
+
+export interface TombstoneEntry {
+  id: string;
+  entity: 'resources' | 'subjects' | 'students' | 'announcements' | 'chat';
+  deleted_at: string;
+}
+
+export function getTombstones(): TombstoneEntry[] {
+  return getStoredOrInit<TombstoneEntry[]>(TOMBSTONES_KEY, []);
+}
+
+export function recordTombstone(id: string, entity: TombstoneEntry['entity']): void {
+  if (!id) return;
+  const list = getTombstones();
+  const existing = list.find((t) => t.id === id);
+  if (!existing) {
+    const updated = [{ id, entity, deleted_at: new Date().toISOString() }, ...list];
+    setStored(TOMBSTONES_KEY, updated.slice(0, 1000));
+  }
+}
+
+export function isTombstoned(id?: string): boolean {
+  if (!id) return false;
+  const list = getTombstones();
+  return list.some((t) => t.id === id);
+}
+
+export function mergeTombstonesLocally(remoteTombstones: TombstoneEntry[]): void {
+  if (!remoteTombstones || !Array.isArray(remoteTombstones) || remoteTombstones.length === 0) return;
+  const localList = getTombstones();
+  const map = new Map<string, TombstoneEntry>();
+  localList.forEach((t) => map.set(t.id, t));
+  remoteTombstones.forEach((rt) => {
+    if (rt && rt.id && !map.has(rt.id)) {
+      map.set(rt.id, rt);
+    }
+  });
+  setStored(TOMBSTONES_KEY, Array.from(map.values()).slice(0, 1000));
+}
 
 // Default social media contact links for Muhammad Hammad
 export const DEFAULT_SOCIALS: PlatformSocials = {
@@ -81,7 +121,7 @@ function isLegacyDemoId(id?: string): boolean {
 // -----------------------------------------------------------------------------
 export function getDemoSubjects(): Subject[] {
   const raw = getStoredOrInit<Subject[]>(SUBJECTS_KEY, INITIAL_DEMO_SUBJECTS);
-  const cleaned = raw.filter((s) => !isLegacyDemoId(s.id));
+  const cleaned = raw.filter((s) => !isLegacyDemoId(s.id) && !isTombstoned(s.id));
   if (cleaned.length !== raw.length) {
     setStored(SUBJECTS_KEY, cleaned);
   }
@@ -103,8 +143,32 @@ export function saveDemoSubject(subject: Subject): Subject {
 }
 
 export function deleteDemoSubject(id: string): void {
+  // Cascading deletion: Find all resources associated with this subject before tombstoning
+  const allResources = getStoredOrInit<Resource[]>(RESOURCES_KEY, INITIAL_DEMO_RESOURCES);
+  const related = allResources.filter((r) => r.subject_id === id);
+  related.forEach((r) => {
+    recordTombstone(r.id, 'resources');
+    deleteResourceFileData(r.id).catch(() => {});
+  });
+
+  recordTombstone(id, 'subjects');
   const list = getDemoSubjects();
   setStored(SUBJECTS_KEY, list.filter((s) => s.id !== id));
+
+  const remainingResources = allResources.filter((r) => r.subject_id !== id && !isTombstoned(r.id));
+  memoryResourcesCache = remainingResources;
+  try {
+    localStorage.setItem(RESOURCES_KEY, JSON.stringify(remainingResources));
+  } catch {
+    const lightweightList = remainingResources.map(({ file_data, ...rest }) => rest);
+    setStored(RESOURCES_KEY, lightweightList);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('studyhub_subjects_updated'));
+    window.dispatchEvent(new Event('studyhub_resources_updated'));
+    window.dispatchEvent(new Event('studyhub_notifications_updated'));
+  }
 }
 
 export function mergeSubjectsLocally(remoteList: Subject[]): Subject[] {
@@ -114,14 +178,16 @@ export function mergeSubjectsLocally(remoteList: Subject[]): Subject[] {
   const slugMap = new Map<string, string>();
 
   localList.forEach((s) => {
-    map.set(s.id, s);
-    if (s.slug) slugMap.set(s.slug.toLowerCase(), s.id);
-    if (s.code) slugMap.set(s.code.toLowerCase(), s.id);
+    if (!isTombstoned(s.id)) {
+      map.set(s.id, s);
+      if (s.slug) slugMap.set(s.slug.toLowerCase(), s.id);
+      if (s.code) slugMap.set(s.code.toLowerCase(), s.id);
+    }
   });
 
   let changed = false;
   remoteList.forEach((remoteSub) => {
-    if (!remoteSub || !remoteSub.id || isLegacyDemoId(remoteSub.id)) return;
+    if (!remoteSub || !remoteSub.id || isLegacyDemoId(remoteSub.id) || isTombstoned(remoteSub.id)) return;
 
     let targetId = remoteSub.id;
     let existing = map.get(targetId);
@@ -149,7 +215,7 @@ export function mergeSubjectsLocally(remoteList: Subject[]): Subject[] {
     }
   });
 
-  const merged = Array.from(map.values());
+  const merged = Array.from(map.values()).filter((s) => !isTombstoned(s.id));
   if (changed || merged.length !== localList.length) {
     setStored(SUBJECTS_KEY, merged);
     if (typeof window !== 'undefined') {
@@ -176,17 +242,25 @@ export function getDemoResources(): Resource[] {
 
   if (memoryResourcesCache) {
     // Ensure every resource has file_data hydrated from fast cache if available
-    return memoryResourcesCache.map((r) => {
-      if (!r.file_data) {
-        const cached = getCachedFileData(r.id);
-        if (cached) return { ...r, file_data: cached };
-      }
-      return r;
-    });
+    return memoryResourcesCache
+      .filter((r) => !isTombstoned(r.id) && !isTombstoned(r.subject_id))
+      .map((r) => {
+        if (!r.file_data) {
+          const cached = getCachedFileData(r.id);
+          if (cached) return { ...r, file_data: cached };
+        }
+        return r;
+      });
   }
 
   const raw = getStoredOrInit<Resource[]>(RESOURCES_KEY, INITIAL_DEMO_RESOURCES);
-  const cleaned = raw.filter((r) => !isLegacyDemoId(r.id) && !isLegacyDemoId(r.subject_id));
+  const cleaned = raw.filter(
+    (r) =>
+      !isLegacyDemoId(r.id) &&
+      !isLegacyDemoId(r.subject_id) &&
+      !isTombstoned(r.id) &&
+      !isTombstoned(r.subject_id)
+  );
   
   // Hydrate file_data from IndexedDB / memory cache
   const hydrated = cleaned.map((r) => {
@@ -242,6 +316,7 @@ export function saveDemoResource(resource: Resource): Resource {
 }
 
 export function deleteDemoResource(id: string): void {
+  recordTombstone(id, 'resources');
   deleteResourceFileData(id).catch(() => {});
   const list = getDemoResources().filter((r) => r.id !== id);
   memoryResourcesCache = list;
@@ -252,11 +327,16 @@ export function deleteDemoResource(id: string): void {
     const lightweightList = list.map(({ file_data, ...rest }) => rest);
     setStored(RESOURCES_KEY, lightweightList);
   }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('studyhub_resources_updated'));
+    window.dispatchEvent(new Event('studyhub_notifications_updated'));
+  }
 }
 
 export function mergeResourcesLocally(remoteList: Resource[]): Resource[] {
   if (!remoteList || !Array.isArray(remoteList)) return getDemoResources();
-  const localList = getDemoResources();
+  const localList = getDemoResources().filter((r) => !isTombstoned(r.id) && !isTombstoned(r.subject_id));
   const map = new Map<string, Resource>();
 
   localList.forEach((r) => {
@@ -265,7 +345,16 @@ export function mergeResourcesLocally(remoteList: Resource[]): Resource[] {
 
   let changed = false;
   remoteList.forEach((remoteRes) => {
-    if (!remoteRes || !remoteRes.id || isLegacyDemoId(remoteRes.id) || isLegacyDemoId(remoteRes.subject_id)) return;
+    if (
+      !remoteRes ||
+      !remoteRes.id ||
+      isLegacyDemoId(remoteRes.id) ||
+      isLegacyDemoId(remoteRes.subject_id) ||
+      isTombstoned(remoteRes.id) ||
+      isTombstoned(remoteRes.subject_id)
+    ) {
+      return;
+    }
 
     const existing = map.get(remoteRes.id);
     if (!existing) {
@@ -299,7 +388,7 @@ export function mergeResourcesLocally(remoteList: Resource[]): Resource[] {
     }
   });
 
-  const merged = Array.from(map.values());
+  const merged = Array.from(map.values()).filter((r) => !isTombstoned(r.id) && !isTombstoned(r.subject_id));
   if (changed || merged.length !== localList.length) {
     memoryResourcesCache = merged;
     try {
@@ -328,6 +417,7 @@ export function getDemoAnnouncements(): Announcement[] {
   const cleaned = raw.filter(
     (a) =>
       !isLegacyDemoId(a.id) &&
+      !isTombstoned(a.id) &&
       a.title !== 'Welcome to Hammad StudyHub Fall 2026!' &&
       a.title !== 'Mid-Term Examination Schedule Announced' &&
       a.title !== 'CS-101 Programming Lab 02 Submission Deadline'
@@ -353,20 +443,25 @@ export function saveDemoAnnouncement(announcement: Announcement): Announcement {
 }
 
 export function deleteDemoAnnouncement(id: string): void {
+  recordTombstone(id, 'announcements');
   const list = getDemoAnnouncements();
   setStored(ANNOUNCEMENTS_KEY, list.filter((a) => a.id !== id));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('studyhub_announcements_updated'));
+    window.dispatchEvent(new Event('studyhub_notifications_updated'));
+  }
 }
 
 export function mergeAnnouncementsLocally(remoteList: Announcement[]): Announcement[] {
   if (!remoteList || !Array.isArray(remoteList)) return getDemoAnnouncements();
-  const localList = getDemoAnnouncements();
+  const localList = getDemoAnnouncements().filter((a) => !isTombstoned(a.id));
   const map = new Map<string, Announcement>();
 
   localList.forEach((a) => map.set(a.id, a));
 
   let changed = false;
   remoteList.forEach((remoteItem) => {
-    if (!remoteItem || !remoteItem.id) return;
+    if (!remoteItem || !remoteItem.id || isTombstoned(remoteItem.id)) return;
     const existing = map.get(remoteItem.id);
     if (!existing) {
       map.set(remoteItem.id, remoteItem);
@@ -381,7 +476,7 @@ export function mergeAnnouncementsLocally(remoteList: Announcement[]): Announcem
     }
   });
 
-  const merged = Array.from(map.values());
+  const merged = Array.from(map.values()).filter((a) => !isTombstoned(a.id));
   if (changed || merged.length !== localList.length) {
     setStored(ANNOUNCEMENTS_KEY, merged);
     if (typeof window !== 'undefined') {
@@ -418,7 +513,8 @@ export interface RegisteredStudentEntry extends UserProfile {
 }
 
 export function getRegisteredStudents(): RegisteredStudentEntry[] {
-  return getStoredOrInit<RegisteredStudentEntry[]>(STUDENTS_KEY, []);
+  const raw = getStoredOrInit<RegisteredStudentEntry[]>(STUDENTS_KEY, []);
+  return raw.filter((s) => !isTombstoned(s.id));
 }
 
 export function registerStudent(input: StudentRegistrationInput): UserProfile {
@@ -466,9 +562,12 @@ export function updateStudentRole(studentId: string, newRole: 'student' | 'cr' |
 }
 
 export function deleteStudent(studentId: string): void {
+  recordTombstone(studentId, 'students');
   const students = getRegisteredStudents();
   setStored(STUDENTS_KEY, students.filter((s) => s.id !== studentId));
-  window.dispatchEvent(new Event('studyhub_students_updated'));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('studyhub_students_updated'));
+  }
 }
 
 export function findStudentByEmail(email: string): RegisteredStudentEntry | undefined {
@@ -477,6 +576,7 @@ export function findStudentByEmail(email: string): RegisteredStudentEntry | unde
 }
 
 export function upsertRegisteredStudentLocally(entry: RegisteredStudentEntry): void {
+  if (isTombstoned(entry.id)) return;
   const students = getRegisteredStudents();
   const index = students.findIndex((s) => s.id === entry.id || s.email.toLowerCase() === entry.email.toLowerCase());
   let updated: RegisteredStudentEntry[];
@@ -491,10 +591,11 @@ export function upsertRegisteredStudentLocally(entry: RegisteredStudentEntry): v
 }
 
 export function mergeRegisteredStudentsLocally(remoteList: RegisteredStudentEntry[]): RegisteredStudentEntry[] {
-  const localList = getRegisteredStudents();
+  const localList = getRegisteredStudents().filter((s) => !isTombstoned(s.id));
   const map = new Map<string, RegisteredStudentEntry>();
   localList.forEach((s) => map.set(s.id, s));
   remoteList.forEach((s) => {
+    if (!s || !s.id || isTombstoned(s.id)) return;
     const existing = map.get(s.id) || localList.find((l) => l.email.toLowerCase() === s.email.toLowerCase());
     if (existing) {
       map.set(existing.id, { ...existing, ...s });
@@ -502,11 +603,13 @@ export function mergeRegisteredStudentsLocally(remoteList: RegisteredStudentEntr
       map.set(s.id, s);
     }
   });
-  const merged = Array.from(map.values()).sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+  const merged = Array.from(map.values())
+    .filter((s) => !isTombstoned(s.id))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   setStored(STUDENTS_KEY, merged);
-  window.dispatchEvent(new Event('studyhub_students_updated'));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('studyhub_students_updated'));
+  }
   return merged;
 }
 
