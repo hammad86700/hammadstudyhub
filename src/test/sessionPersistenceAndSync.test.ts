@@ -122,3 +122,4 @@ describe('Resource Multi-Device Storage & UUID Compliance', () => {
     expect(isUUID(undefined)).toBe(false);
   });
 });
+

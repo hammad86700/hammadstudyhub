@@ -30,6 +30,7 @@ import {
   upsertChatMessageLocally,
 } from './demoStore';
 import { deleteResourceFileData } from './fileStorage';
+import { initCloudSync, pushMutationToCloud } from './cloudSync';
 
 export const SYNC_CHANNEL_NAME = 'studyhub_realtime_global';
 export const BROADCAST_EVENT = 'studyhub_sync_event';
@@ -217,7 +218,9 @@ export async function broadcastDataChange(
     // Ignore storage quota
   }
 
-  // 4. Broadcast to other physical devices (Mobile, Laptop, Tablet) via Supabase Realtime
+  // 4. Broadcast to other physical devices (Mobile, Laptop, Tablet) via Universal Cloud Sync & WebSockets
+  pushMutationToCloud(entity, action, dataOrId, targetId).catch(() => {});
+
   if (isSupabaseConfigured && activeChannel) {
     try {
       await activeChannel.send({
@@ -237,8 +240,13 @@ export async function broadcastDataChange(
 export function initRealtimeSync(queryClient: QueryClient): () => void {
   globalQueryClient = queryClient;
 
+  // Initialize universal cloud sync engine (Cross-device WebSockets + /api/sync)
+  const cloudCleanup = initCloudSync(queryClient);
+
   if (isInitialized && activeChannel) {
-    return () => {};
+    return () => {
+      cloudCleanup();
+    };
   }
   isInitialized = true;
 
@@ -427,6 +435,7 @@ export function initRealtimeSync(queryClient: QueryClient): () => void {
 
   // Cleanup handler
   return () => {
+    cloudCleanup();
     if (typeof window !== 'undefined') {
       window.removeEventListener('storage', handleStoragePulse);
     }

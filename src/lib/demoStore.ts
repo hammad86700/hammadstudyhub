@@ -107,6 +107,58 @@ export function deleteDemoSubject(id: string): void {
   setStored(SUBJECTS_KEY, list.filter((s) => s.id !== id));
 }
 
+export function mergeSubjectsLocally(remoteList: Subject[]): Subject[] {
+  if (!remoteList || !Array.isArray(remoteList)) return getDemoSubjects();
+  const localList = getDemoSubjects();
+  const map = new Map<string, Subject>();
+  const slugMap = new Map<string, string>();
+
+  localList.forEach((s) => {
+    map.set(s.id, s);
+    if (s.slug) slugMap.set(s.slug.toLowerCase(), s.id);
+    if (s.code) slugMap.set(s.code.toLowerCase(), s.id);
+  });
+
+  let changed = false;
+  remoteList.forEach((remoteSub) => {
+    if (!remoteSub || !remoteSub.id || isLegacyDemoId(remoteSub.id)) return;
+
+    let targetId = remoteSub.id;
+    let existing = map.get(targetId);
+
+    if (!existing) {
+      if (remoteSub.slug && slugMap.has(remoteSub.slug.toLowerCase())) {
+        targetId = slugMap.get(remoteSub.slug.toLowerCase())!;
+        existing = map.get(targetId);
+      } else if (remoteSub.code && slugMap.has(remoteSub.code.toLowerCase())) {
+        targetId = slugMap.get(remoteSub.code.toLowerCase())!;
+        existing = map.get(targetId);
+      }
+    }
+
+    if (!existing) {
+      map.set(remoteSub.id, remoteSub);
+      changed = true;
+    } else {
+      const existingTime = new Date(existing.updated_at || existing.created_at || 0).getTime();
+      const remoteTime = new Date(remoteSub.updated_at || remoteSub.created_at || 0).getTime();
+      if (remoteTime > existingTime) {
+        map.set(targetId, { ...existing, ...remoteSub, id: targetId });
+        changed = true;
+      }
+    }
+  });
+
+  const merged = Array.from(map.values());
+  if (changed || merged.length !== localList.length) {
+    setStored(SUBJECTS_KEY, merged);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('studyhub_subjects_updated'));
+    }
+  }
+  return merged;
+}
+
 // -----------------------------------------------------------------------------
 // RESOURCES (INDEXEDDB + SAFE LOCAL PERSISTENCE)
 // -----------------------------------------------------------------------------
@@ -202,6 +254,72 @@ export function deleteDemoResource(id: string): void {
   }
 }
 
+export function mergeResourcesLocally(remoteList: Resource[]): Resource[] {
+  if (!remoteList || !Array.isArray(remoteList)) return getDemoResources();
+  const localList = getDemoResources();
+  const map = new Map<string, Resource>();
+
+  localList.forEach((r) => {
+    map.set(r.id, r);
+  });
+
+  let changed = false;
+  remoteList.forEach((remoteRes) => {
+    if (!remoteRes || !remoteRes.id || isLegacyDemoId(remoteRes.id) || isLegacyDemoId(remoteRes.subject_id)) return;
+
+    const existing = map.get(remoteRes.id);
+    if (!existing) {
+      map.set(remoteRes.id, remoteRes);
+      if (remoteRes.file_data) {
+        saveResourceFileData(remoteRes.id, remoteRes.file_data, {
+          mime_type: remoteRes.mime_type,
+          file_name: remoteRes.file_name,
+          file_size: remoteRes.file_size,
+        }).catch(() => {});
+      }
+      changed = true;
+    } else {
+      const existingTime = new Date(existing.updated_at || existing.created_at || 0).getTime();
+      const remoteTime = new Date(remoteRes.updated_at || remoteRes.created_at || 0).getTime();
+      if (remoteTime > existingTime) {
+        map.set(remoteRes.id, {
+          ...existing,
+          ...remoteRes,
+          file_data: remoteRes.file_data || existing.file_data,
+        });
+        if (remoteRes.file_data) {
+          saveResourceFileData(remoteRes.id, remoteRes.file_data, {
+            mime_type: remoteRes.mime_type,
+            file_name: remoteRes.file_name,
+            file_size: remoteRes.file_size,
+          }).catch(() => {});
+        }
+        changed = true;
+      }
+    }
+  });
+
+  const merged = Array.from(map.values());
+  if (changed || merged.length !== localList.length) {
+    memoryResourcesCache = merged;
+    try {
+      localStorage.setItem(RESOURCES_KEY, JSON.stringify(merged));
+    } catch {
+      const lightweightList = merged.map(({ file_data, ...rest }) => rest);
+      try {
+        localStorage.setItem(RESOURCES_KEY, JSON.stringify(lightweightList));
+      } catch (e) {
+        console.warn('LocalStorage save failed:', e);
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('studyhub_resources_updated'));
+      window.dispatchEvent(new Event('studyhub_notifications_updated'));
+    }
+  }
+  return merged;
+}
+
 // -----------------------------------------------------------------------------
 // ANNOUNCEMENTS
 // -----------------------------------------------------------------------------
@@ -237,6 +355,41 @@ export function saveDemoAnnouncement(announcement: Announcement): Announcement {
 export function deleteDemoAnnouncement(id: string): void {
   const list = getDemoAnnouncements();
   setStored(ANNOUNCEMENTS_KEY, list.filter((a) => a.id !== id));
+}
+
+export function mergeAnnouncementsLocally(remoteList: Announcement[]): Announcement[] {
+  if (!remoteList || !Array.isArray(remoteList)) return getDemoAnnouncements();
+  const localList = getDemoAnnouncements();
+  const map = new Map<string, Announcement>();
+
+  localList.forEach((a) => map.set(a.id, a));
+
+  let changed = false;
+  remoteList.forEach((remoteItem) => {
+    if (!remoteItem || !remoteItem.id) return;
+    const existing = map.get(remoteItem.id);
+    if (!existing) {
+      map.set(remoteItem.id, remoteItem);
+      changed = true;
+    } else {
+      const existingTime = new Date(existing.created_at || 0).getTime();
+      const remoteTime = new Date(remoteItem.created_at || 0).getTime();
+      if (remoteTime > existingTime) {
+        map.set(remoteItem.id, { ...existing, ...remoteItem });
+        changed = true;
+      }
+    }
+  });
+
+  const merged = Array.from(map.values());
+  if (changed || merged.length !== localList.length) {
+    setStored(ANNOUNCEMENTS_KEY, merged);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('studyhub_announcements_updated'));
+      window.dispatchEvent(new Event('studyhub_notifications_updated'));
+    }
+  }
+  return merged;
 }
 
 // -----------------------------------------------------------------------------
@@ -462,6 +615,34 @@ export function upsertChatMessageLocally(message: ChatMessage): void {
   }
   setStored(CHATS_KEY, all);
   window.dispatchEvent(new Event('studyhub_chat_updated'));
+}
+
+export function mergeChatsLocally(remoteList: ChatMessage[]): ChatMessage[] {
+  if (!remoteList || !Array.isArray(remoteList)) return getAllChatMessages();
+  const localList = getAllChatMessages();
+  const map = new Map<string, ChatMessage>();
+  localList.forEach((m) => map.set(m.id, m));
+
+  let changed = false;
+  remoteList.forEach((remoteMsg) => {
+    if (!remoteMsg || !remoteMsg.id) return;
+    if (!map.has(remoteMsg.id)) {
+      map.set(remoteMsg.id, remoteMsg);
+      changed = true;
+    }
+  });
+
+  const merged = Array.from(map.values()).sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  if (changed || merged.length !== localList.length) {
+    setStored(CHATS_KEY, merged);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('studyhub_chat_updated'));
+    }
+  }
+  return merged;
 }
 
 export function getSharedMaterialsBetween(userId1: string, userId2: string): SharedMaterialAttachment[] {
