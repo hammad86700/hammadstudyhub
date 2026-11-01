@@ -15,3 +15,4 @@ comment on column public.resources.file_name is 'Original file name uploaded fro
 comment on column public.resources.file_size is 'Formatted file size of uploaded academic document';
 comment on column public.resources.mime_type is 'MIME content type of uploaded study material';
 comment on column public.resources.original_filename is 'Original uploaded filename for download preservation';
+

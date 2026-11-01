@@ -41,16 +41,26 @@ export const StudentSignupPage: React.FC = () => {
   const { signUpStudent, isLoggedIn } = useAuth();
   const navigate = useNavigate();
 
-  // If already logged in, redirect
+  // If already logged in, redirect to dashboard
   React.useEffect(() => {
     if (isLoggedIn) {
-      navigate('/subjects', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   }, [isLoggedIn, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+
+    if (!displayName.trim()) {
+      setErrorMessage('Please enter your full name.');
+      return;
+    }
+
+    if (!email.trim()) {
+      setErrorMessage('Please enter your email address.');
+      return;
+    }
 
     if (password.length < 6) {
       setErrorMessage('Password must be at least 6 characters long.');
@@ -78,7 +88,7 @@ export const StudentSignupPage: React.FC = () => {
     if (res.error) {
       setErrorMessage(res.error);
     } else {
-      navigate('/subjects', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   };
 

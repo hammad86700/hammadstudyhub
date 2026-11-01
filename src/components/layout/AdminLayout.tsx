@@ -168,6 +168,13 @@ export const AdminLayout: React.FC = () => {
         {/* Footer actions */}
         <div className="p-3 border-t border-slate-800 space-y-1">
           <Link
+            to="/dashboard"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          >
+            <LayoutDashboard className="w-3.5 h-3.5 text-brand-400" />
+            <span>Student Dashboard</span>
+          </Link>
+          <Link
             to="/"
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >

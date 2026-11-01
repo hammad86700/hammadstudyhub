@@ -32,6 +32,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { getBookmarks } from '../../lib/storage';
 import { ContactAdminModal } from '../common/ContactAdminModal';
+import { NotificationBell } from '../common/NotificationBell';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -63,13 +64,22 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const navLinks = [
+  // Authenticated Student Nav vs Public Website Nav
+  const publicNavLinks = [
+    { label: 'About', href: '/about', icon: Info },
+    { label: 'Announcements', href: '/announcements', icon: Bell },
+    { label: 'Feedback', href: '/feedback', icon: MessageSquare },
+  ];
+
+  const studentNavLinks = [
+    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Subjects', href: '/subjects', icon: BookOpen },
     { label: 'Class Chat', href: '/chat', icon: MessageSquare },
     { label: 'Recent', href: '/recent', icon: Clock },
     { label: 'Announcements', href: '/announcements', icon: Bell },
-    { label: 'About', href: '/about', icon: Info },
   ];
+
+  const navLinks = isLoggedIn ? studentNavLinks : publicNavLinks;
 
   const isActive = (path: string) => {
     if (path === '/' && location.pathname === '/') return true;
@@ -83,7 +93,7 @@ export const Navbar: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 gap-4">
             {/* Logo & Brand Mark */}
-            <Link to="/" className="flex items-center gap-3 shrink-0 group focus:outline-none">
+            <Link to={isLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-3 shrink-0 group focus:outline-none">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-600 to-navy-900 p-0.5 shadow-sm group-hover:shadow transition-shadow">
                 <div className="w-full h-full rounded-[10px] bg-slate-900 flex items-center justify-center">
                   <svg
@@ -170,6 +180,9 @@ export const Navbar: React.FC = () => {
                   </span>
                 )}
               </Link>
+
+              {/* Notification Bell (for Logged In Students) */}
+              {isLoggedIn && <NotificationBell />}
 
               {/* Dark Mode Toggle */}
               <button

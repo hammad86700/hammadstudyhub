@@ -29,14 +29,14 @@ export const StudentLoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = (location.state as any)?.from?.pathname || (isStudyManager ? '/admin' : '/subjects');
+  const from = (location.state as any)?.from?.pathname || (isStudyManager ? '/admin' : '/dashboard');
 
   React.useEffect(() => {
     if (isLoggedIn) {
       if (isStudyManager) {
         navigate('/admin', { replace: true });
       } else {
-        navigate('/subjects', { replace: true });
+        navigate('/dashboard', { replace: true });
       }
     }
   }, [isLoggedIn, isStudyManager, navigate]);
@@ -55,7 +55,7 @@ export const StudentLoginPage: React.FC = () => {
       if (res.profile?.role === 'admin' || res.profile?.role === 'cr' || res.profile?.role === 'gr') {
         navigate('/admin', { replace: true });
       } else {
-        navigate(from, { replace: true });
+        navigate(from || '/dashboard', { replace: true });
       }
     }
   };

@@ -7,14 +7,16 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './context/ThemeContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Layouts
 import { PublicLayout } from './components/layout/PublicLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
 
 // Public & Student Pages
-import { HomePage } from './pages/HomePage';
+import { PublicHomePage } from './pages/PublicHomePage';
+import { StudentDashboardPage } from './pages/StudentDashboardPage';
 import { SubjectsPage } from './pages/SubjectsPage';
 import { SubjectDetailPage } from './pages/SubjectDetailPage';
 import { ResourceDetailPage } from './pages/ResourceDetailPage';
@@ -51,6 +53,29 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * Root Route Handler:
+ * - If user is logged in -> lands directly on Student Dashboard (/dashboard)
+ * - If user is not logged in -> displays the Public Website (clean platform introduction & features)
+ */
+const RootRoute: React.FC = () => {
+  const { isLoggedIn, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-3 border-brand-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (isLoggedIn) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <PublicHomePage />;
+};
+
 export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -58,23 +83,87 @@ export const App: React.FC = () => {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              {/* Public Application Routes */}
+              {/* Main Application Experience */}
               <Route element={<PublicLayout />}>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/subjects" element={<SubjectsPage />} />
-                <Route path="/subjects/:slug" element={<SubjectDetailPage />} />
-                <Route path="/resources/:id" element={<ResourceDetailPage />} />
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/bookmarks" element={<BookmarksPage />} />
-                <Route path="/recent" element={<RecentPage />} />
-                <Route path="/announcements" element={<AnnouncementsPage />} />
+                {/* Public vs Student Root Entrypoint */}
+                <Route path="/" element={<RootRoute />} />
+
+                {/* Protected Student Learning Dashboard */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <StudentDashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Protected Academic Courses & Materials */}
+                <Route
+                  path="/subjects"
+                  element={
+                    <ProtectedRoute>
+                      <SubjectsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/subjects/:slug"
+                  element={
+                    <ProtectedRoute>
+                      <SubjectDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/resources/:id"
+                  element={
+                    <ProtectedRoute>
+                      <ResourceDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/search"
+                  element={
+                    <ProtectedRoute>
+                      <SearchPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/bookmarks"
+                  element={
+                    <ProtectedRoute>
+                      <BookmarksPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/recent"
+                  element={
+                    <ProtectedRoute>
+                      <RecentPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/chat"
+                  element={
+                    <ProtectedRoute>
+                      <ChatPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Public Informational Pages */}
                 <Route path="/about" element={<AboutPage />} />
+                <Route path="/announcements" element={<AnnouncementsPage />} />
                 <Route path="/feedback" element={<FeedbackPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/signup" element={<StudentSignupPage />} />
                 <Route path="/login" element={<StudentLoginPage />} />
-                <Route path="/chat" element={<ChatPage />} />
                 <Route path="/admin/login" element={<AdminLoginPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>

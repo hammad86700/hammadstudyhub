@@ -212,3 +212,4 @@ export async function initializeFileStorage(): Promise<void> {
 if (typeof window !== 'undefined') {
   initializeFileStorage().catch(() => {});
 }
+
