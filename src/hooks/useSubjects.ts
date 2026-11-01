@@ -68,15 +68,32 @@ export function useSubjects(filters?: SubjectFilters) {
 
       let allSubjects = Array.from(mergedMap.values());
 
-      // Fetch / Calculate resource counts
-      const resources = getDemoResources().filter((r) => r.status === 'published');
+      // Fetch / Calculate resource counts (merging both local store and Supabase)
+      let allRes = getDemoResources().filter((r) => r.status === 'published');
+      if (isSupabaseConfigured) {
+        try {
+          const { data: remoteRes } = await supabase
+            .from('resources')
+            .select('id, subject_id, status, lesson_date')
+            .eq('status', 'published');
+          if (remoteRes && remoteRes.length > 0) {
+            const resMap = new Map<string, any>();
+            allRes.forEach((r) => resMap.set(r.id, r));
+            remoteRes.forEach((r) => resMap.set(r.id, r));
+            allRes = Array.from(resMap.values());
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       allSubjects = allSubjects.map((s) => {
-        const subResources = resources.filter((r) => r.subject_id === s.id);
-        const sorted = [...subResources].sort((a, b) => b.lesson_date.localeCompare(a.lesson_date));
+        const subResources = allRes.filter((r) => r.subject_id === s.id || r.subject?.slug === s.slug);
+        const sorted = [...subResources].sort((a, b) => (b.lesson_date || '').localeCompare(a.lesson_date || ''));
         return {
           ...s,
-          resource_count: s.resource_count || subResources.length,
-          latest_lesson_date: s.latest_lesson_date || sorted[0]?.lesson_date,
+          resource_count: subResources.length,
+          latest_lesson_date: sorted[0]?.lesson_date || s.latest_lesson_date,
         };
       });
 

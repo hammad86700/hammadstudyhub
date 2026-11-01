@@ -69,99 +69,101 @@ export const DEFAULT_GR_PROFILE: UserProfile = {
 const ACTIVE_USER_STORAGE_KEY = 'studyhub_active_user_v3';
 const ADMIN_AUTH_STORAGE_KEY = 'studyhub_admin_auth_v3';
 
+function getStoredActiveProfile(): UserProfile | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    if (localStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true') {
+      return ADMIN_PROFILE;
+    }
+    const savedUserStr = localStorage.getItem(ACTIVE_USER_STORAGE_KEY);
+    if (savedUserStr) {
+      const savedUser = JSON.parse(savedUserStr) as UserProfile;
+      if (savedUser && savedUser.id && savedUser.email) {
+        const fresh = getRegisteredStudents().find(
+          (s) => s.id === savedUser.id || s.email.toLowerCase() === savedUser.email.toLowerCase()
+        );
+        return fresh
+          ? { ...savedUser, role: fresh.role, display_name: fresh.display_name || savedUser.display_name }
+          : savedUser;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse active user profile from storage:', e);
+  }
+  return null;
+}
+
+function createSyntheticUser(p: UserProfile): User {
+  return {
+    id: p.id,
+    email: p.email,
+    app_metadata: {},
+    user_metadata: { display_name: p.display_name, role: p.role, gender: p.gender },
+    aud: 'authenticated',
+    created_at: p.created_at || new Date().toISOString(),
+  } as User;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const initialProfile = getStoredActiveProfile();
+  const [profile, setProfile] = useState<UserProfile | null>(() => initialProfile);
+  const [user, setUser] = useState<User | null>(() => (initialProfile ? createSyntheticUser(initialProfile) : null));
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(() => !initialProfile);
 
   const isDemoMode = !isSupabaseConfigured;
 
   // Restore session
-  const restoreLocalSession = () => {
+  const restoreLocalSession = (): boolean => {
     try {
-      if (localStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true') {
-        setUser({
-          id: ADMIN_PROFILE.id,
-          email: ADMIN_PROFILE.email,
-          app_metadata: {},
-          user_metadata: { display_name: ADMIN_PROFILE.display_name },
-          aud: 'authenticated',
-          created_at: ADMIN_PROFILE.created_at,
-        } as User);
-        setProfile(ADMIN_PROFILE);
-        return;
-      }
-
-      const savedUserStr = localStorage.getItem(ACTIVE_USER_STORAGE_KEY);
-      if (savedUserStr) {
-        const savedUser = JSON.parse(savedUserStr) as UserProfile;
-        // Verify current role from registered students in case admin promoted to CR/GR
-        const fresh = getRegisteredStudents().find((s) => s.id === savedUser.id);
-        const activeProfile = fresh ? { ...savedUser, role: fresh.role } : savedUser;
-
-        setUser({
-          id: activeProfile.id,
-          email: activeProfile.email,
-          app_metadata: {},
-          user_metadata: { display_name: activeProfile.display_name },
-          aud: 'authenticated',
-          created_at: activeProfile.created_at,
-        } as User);
-        setProfile(activeProfile);
+      const active = getStoredActiveProfile();
+      if (active) {
+        setUser(createSyntheticUser(active));
+        setProfile(active);
+        return true;
       }
     } catch (e) {
       console.warn('Session restoration failed:', e);
     }
+    return false;
   };
 
   useEffect(() => {
-    // 1. If master admin session is stored locally, restore it immediately
-    if (localStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true') {
-      setUser({
-        id: ADMIN_PROFILE.id,
-        email: ADMIN_PROFILE.email,
-        app_metadata: {},
-        user_metadata: { display_name: ADMIN_PROFILE.display_name },
-        aud: 'authenticated',
-        created_at: ADMIN_PROFILE.created_at,
-      } as User);
-      setProfile(ADMIN_PROFILE);
-      setIsLoading(false);
-      return;
-    }
+    // 1. Immediately check local session (covers Admin, CR, GR, and Student)
+    const hasLocal = restoreLocalSession();
 
     if (isSupabaseConfigured) {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        setUser(session?.user ?? null);
         if (session?.user) {
+          setSession(session);
+          setUser(session.user);
           fetchSupabaseProfile(session.user.id);
         } else {
+          // If no Supabase Auth session, keep our local user if logged in (CR, GR, Student, Admin)
+          const restored = restoreLocalSession();
+          if (!restored) {
+            setUser(null);
+            setProfile(null);
+          }
           setIsLoading(false);
         }
+      }).catch(() => {
+        setIsLoading(false);
       });
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
         if (session?.user) {
+          setSession(session);
+          setUser(session.user);
           fetchSupabaseProfile(session.user.id);
         } else {
-          if (localStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true') {
-            setUser({
-              id: ADMIN_PROFILE.id,
-              email: ADMIN_PROFILE.email,
-              app_metadata: {},
-              user_metadata: { display_name: ADMIN_PROFILE.display_name },
-              aud: 'authenticated',
-              created_at: ADMIN_PROFILE.created_at,
-            } as User);
-            setProfile(ADMIN_PROFILE);
-            setIsLoading(false);
-            return;
+          // DO NOT blindly wipe profile on session null! Check if local session is active
+          const restored = restoreLocalSession();
+          if (!restored) {
+            setSession(null);
+            setUser(null);
+            setProfile(null);
           }
-          setProfile(null);
           setIsLoading(false);
         }
       });
@@ -170,7 +172,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         subscription.unsubscribe();
       };
     } else {
-      restoreLocalSession();
+      if (!hasLocal) {
+        setUser(null);
+        setProfile(null);
+      }
       setIsLoading(false);
     }
   }, []);

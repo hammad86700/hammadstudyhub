@@ -247,6 +247,11 @@ export function useLatestResources(limit = 6) {
   });
 }
 
+function isUUID(str?: string): boolean {
+  if (!str) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
 export function useResourceMutations() {
   const queryClient = useQueryClient();
 
@@ -261,10 +266,16 @@ export function useResourceMutations() {
       const slug = input.slug || slugify(input.title);
       const publishedAt =
         input.status === 'published' ? new Date().toISOString() : undefined;
-      const tempId =
-        (input as any).id ||
-        `res-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const now = new Date().toISOString();
+
+      const inputId = (input as any).id;
+      const validUUID = isUUID(inputId)
+        ? inputId
+        : typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : undefined;
+
+      const tempId = validUUID || (inputId && !inputId.startsWith('res-') ? inputId : `res-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
 
       const newRes: Resource = {
         ...input,
@@ -283,37 +294,75 @@ export function useResourceMutations() {
       // 2. If Supabase configured, attempt remote sync
       if (isSupabaseConfigured) {
         try {
-          const { file_data, ...supabasePayload } = input as any;
+          // Resolve subject_id to UUID if needed
+          let resolvedSubjectId = input.subject_id;
+          if (!isUUID(resolvedSubjectId)) {
+            try {
+              const { data: subData } = await supabase
+                .from('subjects')
+                .select('id')
+                .or(`slug.eq.${resolvedSubjectId},id.eq.${resolvedSubjectId}`)
+                .maybeSingle();
+              if (subData?.id) {
+                resolvedSubjectId = subData.id;
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          const supabasePayload: Record<string, any> = {
+            title: input.title.trim(),
+            slug,
+            subject_id: resolvedSubjectId,
+            resource_type: input.resource_type || 'pdf',
+            lesson_date: input.lesson_date || now.substring(0, 10),
+            source_provider: provider,
+            external_url: input.external_url?.trim() || '#',
+            embed_url: embedUrl || null,
+            description: input.description?.trim() || null,
+            topic: input.topic?.trim() || null,
+            chapter: input.chapter?.trim() || null,
+            tags: Array.isArray(input.tags) ? input.tags : [],
+            status: input.status || 'published',
+            published_at: publishedAt || now,
+          };
+
+          if (validUUID) {
+            supabasePayload.id = validUUID;
+          }
+
+          if (input.file_name) supabasePayload.file_name = input.file_name;
+          if (input.file_size) supabasePayload.file_size = input.file_size;
+          if (input.mime_type) supabasePayload.mime_type = input.mime_type;
+          if (input.original_filename) supabasePayload.original_filename = input.original_filename;
+          if (input.google_drive_folder_url) supabasePayload.google_drive_folder_url = input.google_drive_folder_url;
+          if (input.google_drive_file_id) supabasePayload.google_drive_file_id = input.google_drive_file_id;
+
+          const fileData = (input as any).file_data;
+          if (fileData) {
+            supabasePayload.file_data = fileData;
+          }
 
           let { data, error } = await supabase
             .from('resources')
-            .insert({
-              ...input,
-              slug,
-              source_provider: provider,
-              embed_url: embedUrl,
-              published_at: publishedAt,
-            })
+            .insert(supabasePayload)
             .select(`*, subject:subjects(*)`)
             .single();
 
-          // If error and file_data was present, retry without file_data
-          // in case Supabase schema cache does not have file_data column or payload limit exceeded
-          if (error && file_data) {
+          // If insert failed and file_data was included, retry without file_data
+          // in case Supabase schema cache or payload size limit was hit
+          if (error && fileData) {
+            console.warn('Retrying Supabase resource insert without file_data payload:', error.message);
+            const { file_data: _, ...payloadWithoutData } = supabasePayload;
             const retryRes = await supabase
               .from('resources')
-              .insert({
-                ...supabasePayload,
-                slug,
-                source_provider: provider,
-                embed_url: embedUrl,
-                published_at: publishedAt,
-              })
+              .insert(payloadWithoutData)
               .select(`*, subject:subjects(*)`)
               .single();
 
             if (!retryRes.error && retryRes.data) {
-              data = { ...retryRes.data, file_data } as any;
+              data = { ...retryRes.data, file_data: fileData } as any;
               error = null;
             }
           }
@@ -370,14 +419,26 @@ export function useResourceMutations() {
       // 2. Update Supabase
       if (isSupabaseConfigured) {
         try {
-          const updatePayload: any = {
-            ...input,
-            source_provider: provider,
-            embed_url: embedUrl,
-          };
-          if (input.status === 'published' && !input.published_at) {
-            updatePayload.published_at = new Date().toISOString();
-          }
+          const updatePayload: Record<string, any> = {};
+          if (input.title !== undefined) updatePayload.title = input.title.trim();
+          if (input.slug !== undefined) updatePayload.slug = input.slug;
+          if (input.subject_id !== undefined) updatePayload.subject_id = input.subject_id;
+          if (input.resource_type !== undefined) updatePayload.resource_type = input.resource_type;
+          if (input.lesson_date !== undefined) updatePayload.lesson_date = input.lesson_date;
+          if (input.external_url !== undefined) updatePayload.external_url = input.external_url.trim() || '#';
+          if (provider !== undefined) updatePayload.source_provider = provider;
+          if (embedUrl !== undefined) updatePayload.embed_url = embedUrl;
+          if (input.description !== undefined) updatePayload.description = input.description?.trim() || null;
+          if (input.topic !== undefined) updatePayload.topic = input.topic?.trim() || null;
+          if (input.chapter !== undefined) updatePayload.chapter = input.chapter?.trim() || null;
+          if (input.tags !== undefined) updatePayload.tags = Array.isArray(input.tags) ? input.tags : [];
+          if (input.status !== undefined) updatePayload.status = input.status;
+          if (input.published_at !== undefined) updatePayload.published_at = input.published_at;
+          if (input.file_name !== undefined) updatePayload.file_name = input.file_name;
+          if (input.file_size !== undefined) updatePayload.file_size = input.file_size;
+          if (input.mime_type !== undefined) updatePayload.mime_type = input.mime_type;
+          if (input.original_filename !== undefined) updatePayload.original_filename = input.original_filename;
+          if ((input as any).file_data !== undefined) updatePayload.file_data = (input as any).file_data;
 
           const { data, error } = await supabase
             .from('resources')

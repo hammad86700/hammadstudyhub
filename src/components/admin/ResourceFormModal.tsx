@@ -318,7 +318,10 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
           );
 
           // Save directly into StudyHub system storage
-          const uniqueId = `res-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+          const uniqueId =
+            typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `res-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
           await onSubmit({
             ...data,
             id: uniqueId,
