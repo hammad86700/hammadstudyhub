@@ -14,6 +14,7 @@ import {
 } from '../lib/demoStore';
 import { resolveEmbedUrl, detectSourceProvider } from '../lib/googleDrive';
 import { slugify } from '../lib/utils';
+import { broadcastDataChange } from '../lib/realtimeSync';
 
 export function useResources(
   subjectIdOrSlug?: string,
@@ -22,6 +23,9 @@ export function useResources(
 ) {
   return useQuery({
     queryKey: ['resources', subjectIdOrSlug, filters, options],
+    refetchInterval: 8000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
     queryFn: async (): Promise<Resource[]> => {
       let resources: Resource[] = [];
       const localResources = getDemoResources();
@@ -82,6 +86,10 @@ export function useResources(
             resources = ((data as Resource[]) || []).filter(
               (r) => !r.id.startsWith('55555555-') && !r.subject_id.startsWith('44444444-')
             );
+            // Hydrate local cache and IndexedDB with data from Supabase for zero-latency cross-device access
+            resources.forEach((r) => {
+              saveDemoResource(r);
+            });
           } else if (error) {
             console.warn('Supabase resources fetch notice (using local store):', error.message);
           }
@@ -324,10 +332,10 @@ export function useResourceMutations() {
 
       return newRes;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      window.dispatchEvent(new Event('studyhub_resources_updated'));
+      broadcastDataChange('resources', 'create', data);
     },
   });
 
@@ -396,7 +404,7 @@ export function useResourceMutations() {
       queryClient.invalidateQueries({ queryKey: ['resource', data.id] });
       queryClient.invalidateQueries({ queryKey: ['resource', data.slug] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      window.dispatchEvent(new Event('studyhub_resources_updated'));
+      broadcastDataChange('resources', 'update', data);
     },
   });
 
@@ -413,11 +421,12 @@ export function useResourceMutations() {
           console.warn('Supabase resource delete exception:', e?.message);
         }
       }
+      return id;
     },
-    onSuccess: () => {
+    onSuccess: (deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      window.dispatchEvent(new Event('studyhub_resources_updated'));
+      broadcastDataChange('resources', 'delete', deletedId);
     },
   });
 
@@ -454,10 +463,12 @@ export function useResourceMutations() {
 
       return prepared;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      window.dispatchEvent(new Event('studyhub_resources_updated'));
+      if (Array.isArray(data)) {
+        data.forEach((item) => broadcastDataChange('resources', 'create', item));
+      }
     },
   });
 

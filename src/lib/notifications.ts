@@ -129,3 +129,4 @@ export function markAllNotificationsAsRead(notifications?: StudentNotification[]
   notifs.forEach((n) => readSet.add(n.id));
   saveReadIds(readSet);
 }
+

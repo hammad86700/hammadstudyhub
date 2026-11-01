@@ -14,6 +14,7 @@ import {
   getRegisteredStudents,
   upsertRegisteredStudentLocally,
 } from '../lib/demoStore';
+import { broadcastDataChange } from '../lib/realtimeSync';
 
 interface AuthContextType {
   user: User | null;
@@ -154,21 +155,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Listen for student role changes by admin in real-time
+  // Listen for student role changes by admin in real-time across devices
   useEffect(() => {
-    const handleStudentsUpdated = () => {
-      if (profile && profile.role !== 'admin') {
-        const fresh = getRegisteredStudents().find((s) => s.id === profile.id);
-        if (fresh && fresh.role !== profile.role) {
-          const updatedProfile = { ...profile, role: fresh.role };
-          setProfile(updatedProfile);
-          localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(updatedProfile));
+    const checkRoleUpdates = async () => {
+      if (!profile || profile.role === 'admin') return;
+
+      // 1. Check local registered students
+      const fresh = getRegisteredStudents().find((s) => s.id === profile.id);
+      if (fresh && fresh.role !== profile.role) {
+        const updatedProfile = { ...profile, role: fresh.role };
+        setProfile(updatedProfile);
+        localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(updatedProfile));
+        return;
+      }
+
+      // 2. If Supabase configured, check remote database
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase
+            .from('registered_students')
+            .select('role')
+            .eq('id', profile.id)
+            .maybeSingle();
+
+          if (!error && data && data.role !== profile.role) {
+            const updatedProfile = { ...profile, role: data.role as UserRole };
+            setProfile(updatedProfile);
+            localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(updatedProfile));
+          }
+        } catch {
+          // ignore
         }
       }
     };
 
-    window.addEventListener('studyhub_students_updated', handleStudentsUpdated);
-    return () => window.removeEventListener('studyhub_students_updated', handleStudentsUpdated);
+    window.addEventListener('studyhub_students_updated', checkRoleUpdates);
+    window.addEventListener('focus', checkRoleUpdates);
+    const interval = setInterval(checkRoleUpdates, 10000);
+
+    return () => {
+      window.removeEventListener('studyhub_students_updated', checkRoleUpdates);
+      window.removeEventListener('focus', checkRoleUpdates);
+      clearInterval(interval);
+    };
   }, [profile]);
 
   async function fetchSupabaseProfile(userId: string) {
@@ -416,6 +445,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Auto log in newly registered student
       localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(newProfile));
       localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+
+      // Broadcast new student registration across all devices immediately
+      broadcastDataChange('students', 'create', newProfile);
 
       setUser({
         id: newProfile.id,

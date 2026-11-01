@@ -12,10 +12,14 @@ import {
   getDemoResources,
 } from '../lib/demoStore';
 import { slugify } from '../lib/utils';
+import { broadcastDataChange } from '../lib/realtimeSync';
 
 export function useSubjects(filters?: SubjectFilters) {
   return useQuery({
     queryKey: ['subjects', filters],
+    refetchInterval: 10000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
     queryFn: async (): Promise<Subject[]> => {
       let subjects: Subject[] = [];
       const localSubjects = getDemoSubjects();
@@ -43,6 +47,10 @@ export function useSubjects(filters?: SubjectFilters) {
           const { data, error } = await query;
           if (!error && data) {
             subjects = ((data as Subject[]) || []).filter((s) => !s.id.startsWith('44444444-'));
+            // Hydrate local store with remote subjects
+            subjects.forEach((s) => {
+              saveDemoSubject(s);
+            });
           } else if (error) {
             console.warn('Supabase subjects fetch notice (using local store):', error.message);
           }
@@ -196,9 +204,9 @@ export function useSubjectMutations() {
 
       return newSubject;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      window.dispatchEvent(new Event('studyhub_subjects_updated'));
+      broadcastDataChange('subjects', 'create', data);
     },
   });
 
@@ -237,7 +245,7 @@ export function useSubjectMutations() {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
       queryClient.invalidateQueries({ queryKey: ['subject', data.slug] });
       queryClient.invalidateQueries({ queryKey: ['subject', data.id] });
-      window.dispatchEvent(new Event('studyhub_subjects_updated'));
+      broadcastDataChange('subjects', 'update', data);
     },
   });
 
@@ -254,10 +262,11 @@ export function useSubjectMutations() {
           console.warn('Supabase delete exception:', e?.message);
         }
       }
+      return id;
     },
-    onSuccess: () => {
+    onSuccess: (deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      window.dispatchEvent(new Event('studyhub_subjects_updated'));
+      broadcastDataChange('subjects', 'delete', deletedId);
     },
   });
 

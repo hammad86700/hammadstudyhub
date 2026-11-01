@@ -31,8 +31,8 @@ export const AdminDashboardPage: React.FC = () => {
   const [students, setStudents] = useState(() => getRegisteredStudents());
 
   React.useEffect(() => {
-    if (isSupabaseConfigured) {
-      (async () => {
+    const fetchStudents = async () => {
+      if (isSupabaseConfigured) {
         try {
           const { data, error } = await supabase
             .from('registered_students')
@@ -41,16 +41,26 @@ export const AdminDashboardPage: React.FC = () => {
           if (!error && data) {
             const merged = mergeRegisteredStudentsLocally(data as RegisteredStudentEntry[]);
             setStudents(merged);
+            return;
           }
         } catch {
           // ignore
         }
-      })();
-    }
+      }
+      setStudents(getRegisteredStudents());
+    };
 
-    const handleUpdate = () => setStudents(getRegisteredStudents());
+    fetchStudents();
+    const handleUpdate = () => fetchStudents();
     window.addEventListener('studyhub_students_updated', handleUpdate);
-    return () => window.removeEventListener('studyhub_students_updated', handleUpdate);
+    window.addEventListener('focus', handleUpdate);
+    const interval = setInterval(fetchStudents, 10000);
+
+    return () => {
+      window.removeEventListener('studyhub_students_updated', handleUpdate);
+      window.removeEventListener('focus', handleUpdate);
+      clearInterval(interval);
+    };
   }, []);
 
   const { createResource, bulkImportResources } = useResourceMutations();

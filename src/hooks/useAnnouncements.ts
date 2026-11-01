@@ -10,10 +10,14 @@ import {
   saveDemoAnnouncement,
   deleteDemoAnnouncement,
 } from '../lib/demoStore';
+import { broadcastDataChange } from '../lib/realtimeSync';
 
 export function useAnnouncements(options: { includeDrafts?: boolean } = {}) {
   return useQuery({
     queryKey: ['announcements', options],
+    refetchInterval: 10000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
     queryFn: async (): Promise<Announcement[]> => {
       if (isSupabaseConfigured) {
         let query = supabase
@@ -31,13 +35,18 @@ export function useAnnouncements(options: { includeDrafts?: boolean } = {}) {
 
         const { data, error } = await query;
         if (error) throw new Error(error.message);
-        return ((data as Announcement[]) || []).filter(
+        const filtered = ((data as Announcement[]) || []).filter(
           (a) =>
             !a.id.startsWith('66666666-') &&
             a.title !== 'Welcome to Hammad StudyHub Fall 2026!' &&
             a.title !== 'Mid-Term Examination Schedule Announced' &&
             a.title !== 'CS-101 Programming Lab 02 Submission Deadline'
         );
+        // Hydrate local cache
+        filtered.forEach((a) => {
+          saveDemoAnnouncement(a);
+        });
+        return filtered;
       } else {
         let list = getDemoAnnouncements();
         if (!options.includeDrafts) {
@@ -65,6 +74,7 @@ export function useAnnouncementMutations() {
           .select()
           .single();
         if (error) throw new Error(error.message);
+        saveDemoAnnouncement(data as Announcement);
         return data as Announcement;
       } else {
         const newAnn: Announcement = {
@@ -77,22 +87,24 @@ export function useAnnouncementMutations() {
         return saveDemoAnnouncement(newAnn);
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      broadcastDataChange('announcements', 'create', data);
     },
   });
 
   const deleteAnnouncement = useMutation({
     mutationFn: async (id: string) => {
+      deleteDemoAnnouncement(id);
       if (isSupabaseConfigured) {
         const { error } = await supabase.from('announcements').delete().eq('id', id);
         if (error) throw new Error(error.message);
-      } else {
-        deleteDemoAnnouncement(id);
       }
+      return id;
     },
-    onSuccess: () => {
+    onSuccess: (deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      broadcastDataChange('announcements', 'delete', deletedId);
     },
   });
 

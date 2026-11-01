@@ -31,6 +31,7 @@ import {
   mergeRegisteredStudentsLocally,
   RegisteredStudentEntry,
 } from '../../lib/demoStore';
+import { broadcastDataChange } from '../../lib/realtimeSync';
 import { UserRole, Gender } from '../../types';
 import { SEOHead } from '../../components/common/SEOHead';
 import { Card } from '../../components/common/Card';
@@ -74,7 +75,14 @@ export const AdminStudentsPage: React.FC = () => {
       setStudents(getRegisteredStudents());
     };
     window.addEventListener('studyhub_students_updated', handleUpdate);
-    return () => window.removeEventListener('studyhub_students_updated', handleUpdate);
+    window.addEventListener('focus', fetchRemoteStudents);
+    const interval = setInterval(fetchRemoteStudents, 8000);
+
+    return () => {
+      window.removeEventListener('studyhub_students_updated', handleUpdate);
+      window.removeEventListener('focus', fetchRemoteStudents);
+      clearInterval(interval);
+    };
   }, []);
 
   // Strict Security Boundary: CR & GR cannot see student records
@@ -98,6 +106,10 @@ export const AdminStudentsPage: React.FC = () => {
     const roleLabel = newRole === 'cr' ? 'Class Representative (CR)' : newRole === 'gr' ? 'Girls Representative (GR)' : 'Standard Student';
     if (window.confirm(`Update ${name}'s role to ${roleLabel}?`)) {
       updateStudentRole(studentId, newRole);
+      const studentEntry = getRegisteredStudents().find((s) => s.id === studentId);
+      if (studentEntry) {
+        broadcastDataChange('students', 'update', { ...studentEntry, role: newRole });
+      }
       if (isSupabaseConfigured) {
         try {
           await supabase
@@ -114,6 +126,7 @@ export const AdminStudentsPage: React.FC = () => {
   const handleDelete = async (studentId: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete student profile "${name}"?`)) {
       deleteStudent(studentId);
+      broadcastDataChange('students', 'delete', studentId);
       if (isSupabaseConfigured) {
         try {
           await supabase

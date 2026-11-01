@@ -41,13 +41,15 @@ import { AdminResourcesPage } from './pages/admin/AdminResourcesPage';
 import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
 import { AdminStudentsPage } from './pages/admin/AdminStudentsPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
+import { initRealtimeSync } from './lib/realtimeSync';
 
-// Configure TanStack Query
+// Configure TanStack Query with aggressive multi-device sync settings
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes fresh
-      refetchOnWindowFocus: false,
+      staleTime: 1000 * 2, // 2 seconds fresh
+      refetchOnWindowFocus: true, // Auto-sync immediately when returning to laptop window
+      refetchOnReconnect: true, // Auto-sync when reconnecting to network
       retry: 1,
     },
   },
@@ -77,6 +79,11 @@ const RootRoute: React.FC = () => {
 };
 
 export const App: React.FC = () => {
+  React.useEffect(() => {
+    const cleanup = initRealtimeSync(queryClient);
+    return cleanup;
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

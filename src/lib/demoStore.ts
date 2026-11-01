@@ -452,6 +452,18 @@ export function sendChatMessage(data: {
   return newMsg;
 }
 
+export function upsertChatMessageLocally(message: ChatMessage): void {
+  const all = getAllChatMessages();
+  const index = all.findIndex((m) => m.id === message.id);
+  if (index >= 0) {
+    all[index] = message;
+  } else {
+    all.push(message);
+  }
+  setStored(CHATS_KEY, all);
+  window.dispatchEvent(new Event('studyhub_chat_updated'));
+}
+
 export function getSharedMaterialsBetween(userId1: string, userId2: string): SharedMaterialAttachment[] {
   const msgs = getConversationMessages(userId1, userId2);
   const attachments: SharedMaterialAttachment[] = [];

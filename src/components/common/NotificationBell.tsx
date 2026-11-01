@@ -54,9 +54,11 @@ export const NotificationBell: React.FC = () => {
     const handleUpdate = () => refreshNotifs();
     window.addEventListener('studyhub_notifications_updated', handleUpdate);
     window.addEventListener('studyhub_resources_updated', handleUpdate);
+    window.addEventListener('studyhub_announcements_updated', handleUpdate);
     return () => {
       window.removeEventListener('studyhub_notifications_updated', handleUpdate);
       window.removeEventListener('studyhub_resources_updated', handleUpdate);
+      window.removeEventListener('studyhub_announcements_updated', handleUpdate);
     };
   }, [resources, announcements]);
 
@@ -207,3 +209,4 @@ export const NotificationBell: React.FC = () => {
     </div>
   );
 };
+

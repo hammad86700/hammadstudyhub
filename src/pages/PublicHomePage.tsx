@@ -497,3 +497,4 @@ export const PublicHomePage: React.FC = () => {
     </div>
   );
 };
+

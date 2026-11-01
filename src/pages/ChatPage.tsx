@@ -52,6 +52,7 @@ import { Button } from '../components/common/Button';
 import { formatRelativeTime } from '../lib/utils';
 import { ShareMaterialModal } from '../components/chat/ShareMaterialModal';
 import { SharedMaterialsDrawer } from '../components/chat/SharedMaterialsDrawer';
+import { broadcastDataChange } from '../lib/realtimeSync';
 
 export const ChatPage: React.FC = () => {
   const { profile, isLoggedIn } = useAuth();
@@ -94,10 +95,14 @@ export const ChatPage: React.FC = () => {
 
     window.addEventListener('studyhub_students_updated', handleUpdate);
     window.addEventListener('studyhub_chat_updated', handleUpdate);
+    window.addEventListener('focus', handleUpdate);
+    const interval = setInterval(handleUpdate, 4000);
 
     return () => {
       window.removeEventListener('studyhub_students_updated', handleUpdate);
       window.removeEventListener('studyhub_chat_updated', handleUpdate);
+      window.removeEventListener('focus', handleUpdate);
+      clearInterval(interval);
     };
   }, [profile, selectedContact]);
 
@@ -232,7 +237,7 @@ export const ChatPage: React.FC = () => {
     e.preventDefault();
     if (!messageText.trim() || !profile || !selectedContact) return;
 
-    sendChatMessage({
+    const newMsg = sendChatMessage({
       sender_id: profile.id,
       sender_name: profile.display_name,
       sender_role: profile.role,
@@ -243,6 +248,7 @@ export const ChatPage: React.FC = () => {
       message: messageText.trim(),
     });
 
+    broadcastDataChange('chat', 'create', newMsg);
     setMessageText('');
   };
 
@@ -255,7 +261,7 @@ export const ChatPage: React.FC = () => {
 
     const message = optionalMessage || `📎 Shared study material: ${attachment.title}`;
 
-    sendChatMessage({
+    const newMsg = sendChatMessage({
       sender_id: profile.id,
       sender_name: profile.display_name,
       sender_role: profile.role,
@@ -266,6 +272,8 @@ export const ChatPage: React.FC = () => {
       message,
       attachment,
     });
+
+    broadcastDataChange('chat', 'create', newMsg);
 
     if (publishToHub && canManageStudyMaterial) {
       publishSharedMaterialToHub(attachment, profile.display_name);
