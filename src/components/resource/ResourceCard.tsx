@@ -17,10 +17,13 @@ import {
   CheckCircle,
   Tag,
   Lock,
+  Eye,
+  Download,
 } from 'lucide-react';
 import { Resource } from '../../types';
 import { formatLessonDate, getResourceTypeMeta } from '../../lib/utils';
 import { isBookmarked, addBookmark, removeBookmark, isChecklistCompleted, toggleChecklistItem } from '../../lib/storage';
+import { openResourceOnline, downloadResourceFile, getResourceFileUrl } from '../../lib/resourceActions';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../common/Card';
 
@@ -97,52 +100,42 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
     setCompleted(isNow);
   };
 
-  const directUrl =
-    resource.file_data || resource.google_drive_file_url || resource.external_url || '';
+  const directUrl = getResourceFileUrl(resource);
 
-  const handleDirectClick = (e: React.MouseEvent) => {
+  const handleOpenOnlineClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (!isLoggedIn) {
-      e.preventDefault();
       navigate('/signup');
       return;
     }
-    if (directUrl.startsWith('data:')) {
-      e.preventDefault();
-      try {
-        const arr = directUrl.split(',');
-        const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const blob = new Blob([u8arr], { type: mime });
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
-      } catch {
-        window.open(directUrl, '_blank');
-      }
-    } else if (directUrl) {
-      window.open(directUrl, '_blank');
+    openResourceOnline(resource);
+  };
+
+  const handleDownloadClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isLoggedIn) {
+      navigate('/signup');
+      return;
     }
+    downloadResourceFile(resource);
   };
 
   const getActionLabel = () => {
     switch (resource.resource_type) {
       case 'pdf':
-        return 'Open PDF File';
+        return 'View PDF';
       case 'presentation':
-        return 'Open Slides';
+        return 'View Slides';
       case 'video':
         return 'Watch Video';
       case 'past_paper':
-        return 'Open Past Paper';
+        return 'View Paper';
       case 'assignment':
-        return 'Open Assignment';
+        return 'View Assignment';
       default:
-        return 'Open Material';
+        return 'View Online';
     }
   };
 
@@ -206,13 +199,13 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
                 href={isLoggedIn ? directUrl : '/signup'}
                 target={isLoggedIn ? '_blank' : '_self'}
                 rel="noopener noreferrer"
-                onClick={handleDirectClick}
+                onClick={handleOpenOnlineClick}
                 className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none inline-flex items-center gap-1.5 group cursor-pointer"
-                title={isLoggedIn ? 'Directly open study material in new tab' : 'Sign up to access this study material'}
+                title={isLoggedIn ? 'Read or open study material directly without downloading' : 'Sign up to access this study material'}
               >
                 <span>{resource.title}</span>
                 {isLoggedIn ? (
-                  <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
+                  <Eye className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
                 ) : (
                   <Lock className="w-3.5 h-3.5 text-brand-500 shrink-0" />
                 )}
@@ -226,6 +219,15 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
               </Link>
             )}
           </h4>
+
+          {/* Attached File Badge (if uploaded from system) */}
+          {resource.file_name && (
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+              <span className="truncate max-w-[220px]">📄 {resource.file_name}</span>
+              {resource.file_size && <span className="opacity-75 shrink-0">({resource.file_size})</span>}
+            </div>
+          )}
+
           {resource.description && (
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
               {resource.description}
@@ -265,36 +267,52 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
         )}
       </div>
 
-      {/* Footer Info: Lesson Date & Direct Open Action */}
-      <div className="px-4 py-2.5 bg-slate-50/70 dark:bg-navy-950/60 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium">
+      {/* Footer Actions: Lesson Date & 2 Student Options (View Online vs Download) */}
+      <div className="px-3.5 sm:px-4 py-2.5 bg-slate-50/70 dark:bg-navy-950/60 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium shrink-0">
           <Calendar className="w-3.5 h-3.5 text-brand-500" />
           <span>{formatLessonDate(resource.lesson_date, { format: 'short' })}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* OPTION 1: Open / View Directly (without download) */}
+          <button
+            type="button"
+            onClick={handleOpenOnlineClick}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              isLoggedIn
+                ? 'text-brand-700 dark:text-brand-300 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800'
+                : 'text-slate-500 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
+            }`}
+            title={isLoggedIn ? 'Read & preview this material directly without downloading' : 'Sign up to read online'}
+          >
+            {isLoggedIn ? <Eye className="w-3.5 h-3.5" /> : <Lock className="w-3 h-3 text-brand-500" />}
+            <span>{isLoggedIn ? getActionLabel() : 'View'}</span>
+          </button>
+
+          {/* OPTION 2: Download File directly to device */}
+          <button
+            type="button"
+            onClick={handleDownloadClick}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-2xs cursor-pointer ${
+              isLoggedIn
+                ? 'text-white bg-brand-600 hover:bg-brand-700'
+                : 'text-brand-700 dark:text-brand-300 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800'
+            }`}
+            title={isLoggedIn ? 'Download file directly to your device' : 'Sign up to download file'}
+          >
+            {isLoggedIn ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3 h-3 text-brand-500" />}
+            <span>Download</span>
+          </button>
+
+          {/* Full Viewer Link */}
           <Link
             to={`/resources/${resource.slug || resource.id}`}
-            className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-medium"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 text-xs"
+            title="Open in Full Study Viewer"
           >
-            Viewer
+            <ExternalLink className="w-3.5 h-3.5" />
           </Link>
-
-          {directUrl && (
-            <button
-              type="button"
-              onClick={handleDirectClick}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer ${
-                isLoggedIn
-                  ? 'text-white bg-brand-600 hover:bg-brand-700'
-                  : 'text-brand-700 dark:text-brand-300 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800'
-              }`}
-              title={isLoggedIn ? 'Directly open PDF / Material in new tab' : 'Sign up or log in to view this study material'}
-            >
-              <span>{isLoggedIn ? getActionLabel() : 'Sign In to Access'}</span>
-              {isLoggedIn ? <ExternalLink className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-            </button>
-          )}
         </div>
       </div>
     </Card>

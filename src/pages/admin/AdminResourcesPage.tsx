@@ -22,6 +22,7 @@ import { Resource, ResourceType } from '../../types';
 import { useSubjects } from '../../hooks/useSubjects';
 import { useResources, useResourceMutations } from '../../hooks/useResources';
 import { formatLessonDate, exportResourcesToCSV, getResourceTypeMeta } from '../../lib/utils';
+import { openResourceOnline, downloadResourceFile } from '../../lib/resourceActions';
 import { ResourceFormModal } from '../../components/admin/ResourceFormModal';
 import { AddYouTubeLectureModal } from '../../components/admin/AddYouTubeLectureModal';
 import { CsvBulkImportModal } from '../../components/admin/CsvBulkImportModal';
@@ -279,36 +280,26 @@ export const AdminResourcesPage: React.FC = () => {
                       </button>
                     </td>
                     <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
-                      <a
-                        href={res.file_data || res.google_drive_file_url || res.external_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => {
-                          const target = res.file_data || res.google_drive_file_url || res.external_url;
-                          if (target?.startsWith('data:')) {
-                            e.preventDefault();
-                            try {
-                              const arr = target.split(',');
-                              const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
-                              const bstr = atob(arr[1]);
-                              let n = bstr.length;
-                              const u8arr = new Uint8Array(n);
-                              while (n--) {
-                                u8arr[n] = bstr.charCodeAt(n);
-                              }
-                              const blob = new Blob([u8arr], { type: mime });
-                              const blobUrl = URL.createObjectURL(blob);
-                              window.open(blobUrl, '_blank');
-                            } catch {
-                              window.open(target, '_blank');
-                            }
-                          }
-                        }}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 inline-block cursor-pointer"
-                        title="Directly open study material / PDF"
+                      {/* OPTION 1: View Online */}
+                      <button
+                        type="button"
+                        onClick={() => openResourceOnline(res)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-block cursor-pointer"
+                        title="View / Read directly in browser"
                       >
                         <ExternalLink className="w-4 h-4" />
-                      </a>
+                      </button>
+
+                      {/* OPTION 2: Download */}
+                      <button
+                        type="button"
+                        onClick={() => downloadResourceFile(res)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors inline-block cursor-pointer"
+                        title="Download file directly"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+
                       <button
                         onClick={() => handleOpenEdit(res)}
                         className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-slate-100 dark:hover:bg-slate-800"

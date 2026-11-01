@@ -21,11 +21,21 @@ import {
   Flag,
   MessageCircle,
   FolderOpen,
+  Eye,
+  Archive,
+  Presentation,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Resource } from '../../types';
 import { formatLessonDate, formatRelativeTime, getResourceTypeMeta } from '../../lib/utils';
 import { parseGoogleDriveUrl } from '../../lib/googleDrive';
 import { isBookmarked, addBookmark, removeBookmark, isChecklistCompleted, toggleChecklistItem } from '../../lib/storage';
+import {
+  openResourceOnline,
+  downloadResourceFile,
+  getResourceFileUrl,
+  isOfficeDocument,
+} from '../../lib/resourceActions';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { Breadcrumb } from '../common/Breadcrumb';
@@ -86,29 +96,25 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
     setCompleted(isNow);
   };
 
-  const directTargetUrl =
-    resource.file_data || resource.google_drive_file_url || resource.external_url || '';
+  const directTargetUrl = getResourceFileUrl(resource);
 
-  const handleDirectClick = (e: React.MouseEvent) => {
-    if (directTargetUrl.startsWith('data:')) {
-      e.preventDefault();
-      try {
-        const arr = directTargetUrl.split(',');
-        const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const blob = new Blob([u8arr], { type: mime });
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
-      } catch {
-        window.open(directTargetUrl, '_blank');
-      }
-    }
+  const handleOpenOnlineClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    openResourceOnline(resource);
   };
+
+  const handleDownloadClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    downloadResourceFile(resource);
+  };
+
+  const isImageFile =
+    resource.resource_type === 'whiteboard' ||
+    resource.mime_type?.startsWith('image/') ||
+    Boolean(resource.file_name?.match(/\.(jpg|jpeg|png|webp|svg)$/i));
+
+  const isOfficeFile = isOfficeDocument(resource.file_name, resource.mime_type);
+  const isZipFile = resource.mime_type?.includes('zip') || Boolean(resource.file_name?.match(/\.(zip|rar|7z|tar|gz)$/i));
 
   const breadcrumbs = [
     { label: 'Subjects', href: '/subjects' },
@@ -247,72 +253,136 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
             {meta.label} Preview
             <span className="text-slate-400 font-normal">
-              ({resource.file_data ? 'System Cloud Storage' : resource.source_provider === 'youtube' ? 'YouTube Player' : 'External Host'})
+              ({resource.file_data ? 'System Cloud Storage' : resource.source_provider === 'youtube' ? 'YouTube Player' : 'Direct Host'})
             </span>
           </div>
 
+          {/* Student 2-Option Toolbar: View Online vs Download */}
           <div className="flex items-center gap-2">
-            {driveInfo?.directDownloadUrl && (
-              <a
-                href={driveInfo.directDownloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Direct Download</span>
-              </a>
-            )}
-
-            <a
-              href={directTargetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleDirectClick}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white transition-colors shadow-xs cursor-pointer"
+            {/* OPTION 1: View Online (without download) */}
+            <button
+              type="button"
+              onClick={handleOpenOnlineClick}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+              title="Open directly in browser tab to read online"
             >
-              <span>{resource.resource_type === 'pdf' ? 'Open PDF File' : 'Open in New Tab'}</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+              <Eye className="w-3.5 h-3.5 text-brand-500" />
+              <span>View Online</span>
+            </button>
+
+            {/* OPTION 2: Download File */}
+            <button
+              type="button"
+              onClick={handleDownloadClick}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition-colors shadow-xs cursor-pointer"
+              title="Download file directly to your computer or phone"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download File</span>
+            </button>
           </div>
         </div>
 
         {/* Embed Frame or Media Player */}
-        <div className="relative bg-slate-900 min-h-[420px] sm:min-h-[560px] flex items-center justify-center">
-          {resource.file_data ? (
+        <div className="relative bg-slate-900 min-h-[420px] sm:min-h-[560px] flex items-center justify-center p-2 sm:p-4">
+          {/* Image files */}
+          {isImageFile && resource.file_data ? (
+            <div className="flex flex-col items-center justify-center max-w-full">
+              <img
+                src={resource.file_data}
+                alt={resource.title}
+                className="max-w-full max-h-[640px] rounded-lg shadow-md object-contain bg-slate-950"
+              />
+            </div>
+          ) : isOfficeFile || isZipFile ? (
+            /* Office documents (DOCX, PPTX, XLSX) and ZIP packages */
+            <div className="p-8 text-center text-white space-y-5 max-w-lg">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-800/90 border border-slate-700 flex items-center justify-center text-brand-400 shadow-lg">
+                {isZipFile ? (
+                  <Archive className="w-8 h-8 text-indigo-400" />
+                ) : resource.file_name?.match(/\.(ppt|pptx)$/i) ? (
+                  <Presentation className="w-8 h-8 text-amber-400" />
+                ) : resource.file_name?.match(/\.(xls|xlsx)$/i) ? (
+                  <FileSpreadsheet className="w-8 h-8 text-emerald-400" />
+                ) : (
+                  <FileText className="w-8 h-8 text-blue-400" />
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-lg font-bold text-slate-100">
+                  {resource.file_name || resource.title}
+                </h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Academic learning document {resource.file_size && `• ${resource.file_size}`}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center gap-3 flex-wrap pt-2">
+                <button
+                  type="button"
+                  onClick={handleOpenOnlineClick}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors cursor-pointer"
+                >
+                  <Eye className="w-4 h-4 text-brand-400" />
+                  <span>Open Preview</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadClick}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white shadow-md transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download Document</span>
+                </button>
+              </div>
+            </div>
+          ) : resource.file_data ? (
+            /* PDF & embedded documents */
             <iframe
               src={resource.file_data}
               title={resource.title}
-              className="w-full h-[520px] sm:h-[680px] border-0 bg-white"
+              className="w-full h-[540px] sm:h-[700px] border-0 bg-white rounded-lg"
             />
           ) : resource.embed_url && !iframeError ? (
+            /* YouTube or Remote Video/Doc */
             <iframe
               src={resource.embed_url}
               title={resource.title}
-              className="w-full h-[520px] sm:h-[680px] border-0"
+              className="w-full h-[540px] sm:h-[700px] border-0 rounded-lg"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
               onError={() => setIframeError(true)}
             />
           ) : (
+            /* Fallback Launch block */
             <div className="p-8 text-center text-white space-y-4 max-w-md">
               <div className="w-14 h-14 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-brand-400">
                 <FileText className="w-7 h-7" />
               </div>
-              <h4 className="text-lg font-bold">Open Resource Directly</h4>
+              <h4 className="text-lg font-bold">Study Material Access</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Click below to launch this learning resource in your browser.
+                Choose whether you want to read online in your browser or download directly to your device.
               </p>
-              <a
-                href={directTargetUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={handleDirectClick}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold bg-brand-600 hover:bg-brand-700 text-white text-sm shadow-md cursor-pointer"
-              >
-                <span>Launch Document / PDF</span>
-                <ExternalLink className="w-4 h-4" />
-              </a>
+              <div className="flex items-center justify-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleOpenOnlineClick}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold bg-slate-800 hover:bg-slate-700 text-white text-xs cursor-pointer border border-slate-700"
+                >
+                  <Eye className="w-4 h-4 text-brand-400" />
+                  <span>View Online</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadClick}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold bg-brand-600 hover:bg-brand-700 text-white text-xs shadow-md cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download File</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

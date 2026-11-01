@@ -21,6 +21,11 @@ import {
   INITIAL_DEMO_RESOURCES,
   INITIAL_DEMO_ANNOUNCEMENTS,
 } from './mockData';
+import {
+  saveResourceFileData,
+  getCachedFileData,
+  deleteResourceFileData,
+} from './fileStorage';
 
 const SUBJECTS_KEY = 'studyhub_subjects_clean';
 const RESOURCES_KEY = 'studyhub_resources_clean';
@@ -103,18 +108,57 @@ export function deleteDemoSubject(id: string): void {
 }
 
 // -----------------------------------------------------------------------------
-// RESOURCES
+// RESOURCES (INDEXEDDB + SAFE LOCAL PERSISTENCE)
 // -----------------------------------------------------------------------------
+let memoryResourcesCache: Resource[] | null = null;
+
+export function resetDemoResourcesCache(): void {
+  memoryResourcesCache = null;
+}
+
 export function getDemoResources(): Resource[] {
+  // If localStorage was cleared (e.g. in test suites or storage reset), clear memory cache
+  if (typeof localStorage !== 'undefined' && localStorage.getItem(RESOURCES_KEY) === null) {
+    memoryResourcesCache = null;
+  }
+
+  if (memoryResourcesCache) {
+    // Ensure every resource has file_data hydrated from fast cache if available
+    return memoryResourcesCache.map((r) => {
+      if (!r.file_data) {
+        const cached = getCachedFileData(r.id);
+        if (cached) return { ...r, file_data: cached };
+      }
+      return r;
+    });
+  }
+
   const raw = getStoredOrInit<Resource[]>(RESOURCES_KEY, INITIAL_DEMO_RESOURCES);
   const cleaned = raw.filter((r) => !isLegacyDemoId(r.id) && !isLegacyDemoId(r.subject_id));
-  if (cleaned.length !== raw.length) {
-    setStored(RESOURCES_KEY, cleaned);
-  }
-  return cleaned;
+  
+  // Hydrate file_data from IndexedDB / memory cache
+  const hydrated = cleaned.map((r) => {
+    const cached = getCachedFileData(r.id);
+    if (cached && !r.file_data) {
+      return { ...r, file_data: cached };
+    }
+    return r;
+  });
+
+  memoryResourcesCache = hydrated;
+  return hydrated;
 }
 
 export function saveDemoResource(resource: Resource): Resource {
+  // 1. If file_data is present, store in persistent IndexedDB & memory cache
+  if (resource.file_data) {
+    saveResourceFileData(resource.id, resource.file_data, {
+      mime_type: resource.mime_type,
+      file_name: resource.file_name,
+      file_size: resource.file_size,
+    }).catch((e) => console.warn('IndexedDB async save notice:', e));
+  }
+
   const list = getDemoResources();
   const index = list.findIndex((r) => r.id === resource.id);
   let updated: Resource[];
@@ -124,13 +168,38 @@ export function saveDemoResource(resource: Resource): Resource {
   } else {
     updated = [{ ...resource, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...list];
   }
-  setStored(RESOURCES_KEY, updated);
+
+  memoryResourcesCache = updated;
+
+  // 2. Safely persist to localStorage with QuotaExceededError protection
+  try {
+    localStorage.setItem(RESOURCES_KEY, JSON.stringify(updated));
+  } catch (quotaError) {
+    // Quota exceeded: persist lightweight metadata list without huge file_data strings.
+    // The actual binary file_data remains completely intact in IndexedDB & memoryCache!
+    console.warn('LocalStorage quota reached. Storing metadata in localStorage and file payload in IndexedDB.');
+    try {
+      const lightweightList = updated.map(({ file_data, ...rest }) => rest);
+      localStorage.setItem(RESOURCES_KEY, JSON.stringify(lightweightList));
+    } catch (e2) {
+      console.warn('LocalStorage save failed:', e2);
+    }
+  }
+
   return resource;
 }
 
 export function deleteDemoResource(id: string): void {
-  const list = getDemoResources();
-  setStored(RESOURCES_KEY, list.filter((r) => r.id !== id));
+  deleteResourceFileData(id).catch(() => {});
+  const list = getDemoResources().filter((r) => r.id !== id);
+  memoryResourcesCache = list;
+
+  try {
+    localStorage.setItem(RESOURCES_KEY, JSON.stringify(list));
+  } catch {
+    const lightweightList = list.map(({ file_data, ...rest }) => rest);
+    setStored(RESOURCES_KEY, lightweightList);
+  }
 }
 
 // -----------------------------------------------------------------------------

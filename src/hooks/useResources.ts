@@ -253,7 +253,9 @@ export function useResourceMutations() {
       const slug = input.slug || slugify(input.title);
       const publishedAt =
         input.status === 'published' ? new Date().toISOString() : undefined;
-      const tempId = `res-${Date.now()}`;
+      const tempId =
+        (input as any).id ||
+        `res-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const now = new Date().toISOString();
 
       const newRes: Resource = {
@@ -267,13 +269,15 @@ export function useResourceMutations() {
         updated_at: now,
       };
 
-      // 1. ALWAYS save to local store first
+      // 1. ALWAYS save to local store & IndexedDB first
       saveDemoResource(newRes);
 
       // 2. If Supabase configured, attempt remote sync
       if (isSupabaseConfigured) {
         try {
-          const { data, error } = await supabase
+          const { file_data, ...supabasePayload } = input as any;
+
+          let { data, error } = await supabase
             .from('resources')
             .insert({
               ...input,
@@ -284,6 +288,27 @@ export function useResourceMutations() {
             })
             .select(`*, subject:subjects(*)`)
             .single();
+
+          // If error and file_data was present, retry without file_data
+          // in case Supabase schema cache does not have file_data column or payload limit exceeded
+          if (error && file_data) {
+            const retryRes = await supabase
+              .from('resources')
+              .insert({
+                ...supabasePayload,
+                slug,
+                source_provider: provider,
+                embed_url: embedUrl,
+                published_at: publishedAt,
+              })
+              .select(`*, subject:subjects(*)`)
+              .single();
+
+            if (!retryRes.error && retryRes.data) {
+              data = { ...retryRes.data, file_data } as any;
+              error = null;
+            }
+          }
 
           if (!error && data) {
             deleteDemoResource(tempId);
