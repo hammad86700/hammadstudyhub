@@ -34,6 +34,7 @@ import {
   Check,
   Copy,
   PlusCircle,
+  ArrowLeft,
 } from 'lucide-react';
 import { useAuth, ADMIN_PROFILE, DEFAULT_CR_PROFILE, DEFAULT_GR_PROFILE } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -405,7 +406,7 @@ export const ChatPage: React.FC = () => {
       {/* Main Chat Layout */}
       <Card className="h-[640px] sm:h-[700px] flex overflow-hidden border border-slate-200 dark:border-slate-800 shadow-card">
         {/* Left Contacts Sidebar */}
-        <div className="w-full sm:w-80 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50/50 dark:bg-navy-950/40">
+        <div className={`${selectedContact ? 'hidden sm:flex' : 'flex'} w-full sm:w-80 sm:shrink-0 border-r border-slate-200 dark:border-slate-800 flex-col bg-slate-50/50 dark:bg-navy-950/40`}>
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-brand-600" />
@@ -484,18 +485,26 @@ export const ChatPage: React.FC = () => {
         </div>
 
         {/* Right Chat Window */}
-        <div className="flex-1 flex flex-col bg-white dark:bg-navy-900 min-w-0">
+        <div className={`${selectedContact ? 'flex' : 'hidden sm:flex'} flex-1 flex-col bg-white dark:bg-navy-900 min-w-0`}>
           {selectedContact ? (
             <>
               {/* Conversation Top Header */}
               <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/30 dark:bg-navy-950/30">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-brand-600 text-white font-bold flex items-center justify-center shadow-xs">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedContact(null)}
+                    className="sm:hidden p-1.5 -ml-1 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
+                    title="Back to conversations"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-brand-600 text-white font-bold flex items-center justify-center shadow-xs shrink-0 text-xs sm:text-sm">
                     {selectedContact.display_name.substring(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
                         {selectedContact.display_name}
                       </h3>
                       {getRoleBadge(selectedContact.role)}

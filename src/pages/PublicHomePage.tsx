@@ -39,7 +39,7 @@ import { Card } from '../components/common/Card';
 
 export const PublicHomePage: React.FC = () => {
   return (
-    <div className="space-y-16 sm:space-y-24 pb-20">
+    <div className="space-y-12 sm:space-y-24 pb-20 w-full max-w-full overflow-x-hidden">
       <SEOHead
         title="Hammad StudyHub — Learn. Revise. Grow."
         description="Your studies, organized in one place. Created by Muhammad Hammad. High-quality daily lecture notes, whiteboard photos, video lessons, and past papers."

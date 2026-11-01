@@ -194,11 +194,11 @@ export const DashboardDirectMessaging: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2">
+            <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2 w-full min-w-0">
               <Button
                 size="sm"
                 variant="primary"
-                className="w-full text-xs font-bold"
+                className="flex-1 min-w-0 text-xs font-bold"
                 onClick={() => handleOpenCompose(crProfile)}
                 leftIcon={<Send className="w-3.5 h-3.5" />}
               >
@@ -243,11 +243,11 @@ export const DashboardDirectMessaging: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2">
+            <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2 w-full min-w-0">
               <Button
                 size="sm"
                 variant="primary"
-                className="w-full text-xs font-bold !bg-pink-600 hover:!bg-pink-700 !border-pink-600"
+                className="flex-1 min-w-0 text-xs font-bold !bg-pink-600 hover:!bg-pink-700 !border-pink-600"
                 onClick={() => handleOpenCompose(grProfile)}
                 leftIcon={<Send className="w-3.5 h-3.5" />}
               >
@@ -290,11 +290,11 @@ export const DashboardDirectMessaging: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2">
+            <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2 w-full min-w-0">
               <Button
                 size="sm"
                 variant="primary"
-                className="w-full text-xs font-bold !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600"
+                className="flex-1 min-w-0 text-xs font-bold !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600"
                 onClick={() => handleOpenCompose(ADMIN_PROFILE)}
                 leftIcon={<Send className="w-3.5 h-3.5" />}
               >
@@ -474,3 +474,4 @@ export const DashboardDirectMessaging: React.FC = () => {
     </section>
   );
 };
+

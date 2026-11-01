@@ -20,7 +20,7 @@ export const SubjectsPage: React.FC = () => {
   const { data: subjects, isLoading } = useSubjects(filters);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-6">
+    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-12 space-y-6 w-full max-w-full overflow-x-hidden">
       <SEOHead
         title="Subjects Directory"
         description="Browse all academic subjects, lecture notes, syllabus materials, and past papers organized by Muhammad Hammad."

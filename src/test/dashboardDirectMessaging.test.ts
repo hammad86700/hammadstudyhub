@@ -203,3 +203,4 @@ describe('Dashboard Direct Messaging & Representative Rules', () => {
     expect(DEFAULT_GR_PROFILE.display_name).toContain('GR');
   });
 });
+

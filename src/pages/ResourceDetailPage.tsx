@@ -67,7 +67,7 @@ export const ResourceDetailPage: React.FC = () => {
   // Study Material Protection Gate for Guests
   if (!isLoggedIn) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+      <div className="max-w-4xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6 w-full max-w-full overflow-x-hidden">
         <SEOHead
           title={`${resource.title} — Sign In Required`}
           description="Please sign in or create an account to view and download study materials."
@@ -92,7 +92,7 @@ export const ResourceDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8 sm:space-y-12 w-full max-w-full overflow-x-hidden">
       <SEOHead
         title={resource.title}
         description={resource.description || `Study material for ${resource.subject?.name || 'Class'}.`}

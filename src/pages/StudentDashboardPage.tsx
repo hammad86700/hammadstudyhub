@@ -133,7 +133,7 @@ export const StudentDashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 sm:space-y-10 pb-16">
+    <div className="space-y-6 sm:space-y-10 pb-16 w-full max-w-full overflow-x-hidden">
       <SEOHead
         title={`Dashboard — ${profile?.display_name || 'Student'} | Hammad StudyHub`}
         description="Your personal Hammad StudyHub dashboard. Access subjects, latest lecture notes, whiteboard photos, and class announcements."
@@ -141,21 +141,21 @@ export const StudentDashboardPage: React.FC = () => {
 
       {/* 1. Header Welcome Bar */}
       <section className="bg-white dark:bg-navy-900 border-b border-slate-200/80 dark:border-slate-800/80 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4">
             {/* Student Greeting */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+            <div className="space-y-1 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">
                   Student Learning Space
                 </span>
                 <span className="text-slate-300 dark:text-slate-700">&bull;</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">
                   {todayFormatted}
                 </span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight break-words">
                 Welcome back,{' '}
                 <span className="text-brand-600 dark:text-brand-400">
                   {profile?.display_name || 'Student'}!
@@ -167,14 +167,11 @@ export const StudentDashboardPage: React.FC = () => {
             </div>
 
             {/* Quick Actions & Profile Pills */}
-            <div className="flex items-center gap-2.5 flex-wrap">
-              {/* Notification Bell */}
-              <NotificationBell />
-
+            <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
               {/* Chat Shortcut */}
               <Link
                 to="/chat"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-navy-950 dark:hover:bg-slate-800 transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-navy-950 dark:hover:bg-slate-800 transition-colors"
                 title="Open Class Chat"
               >
                 <MessageSquare className="w-4 h-4 text-brand-500" />
@@ -185,16 +182,16 @@ export const StudentDashboardPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setProfileModalOpen(true)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-200/80 dark:border-brand-800/80 hover:bg-brand-100 dark:hover:bg-brand-950 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-200/80 dark:border-brand-800/80 hover:bg-brand-100 dark:hover:bg-brand-950 transition-colors cursor-pointer min-w-0"
                 title="View Student Profile"
               >
-                <div className="w-5 h-5 rounded-full bg-brand-600 text-white text-[10px] font-bold flex items-center justify-center">
+                <div className="w-5 h-5 rounded-full bg-brand-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
                   {(profile?.display_name || 'S').charAt(0).toUpperCase()}
                 </div>
-                <span className="truncate max-w-[120px]">
-                  {profile?.display_name?.split(' ')[0] || 'Profile'}
+                <span className="truncate max-w-[80px] sm:max-w-[130px]">
+                  {profile?.display_name ? (profile.display_name.split(' ').length > 1 && profile.display_name.split(' ')[0].length <= 2 ? profile.display_name : profile.display_name.split(' ')[0]) : 'Profile'}
                 </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded uppercase font-bold bg-white dark:bg-navy-900 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300">
+                <span className="text-[10px] px-1.5 py-0.2 rounded uppercase font-bold bg-white dark:bg-navy-900 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 shrink-0">
                   {profile?.role || 'student'}
                 </span>
               </button>
@@ -203,7 +200,7 @@ export const StudentDashboardPage: React.FC = () => {
               {isStudyManager && (
                 <Link
                   to="/admin"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors"
                 >
                   <ShieldCheck className="w-4 h-4" />
                   <span>{isAdmin ? 'Admin' : isCR ? 'CR Portal' : 'GR Portal'}</span>
@@ -214,7 +211,7 @@ export const StudentDashboardPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => signOut()}
-                className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                 title="Log Out of StudyHub"
               >
                 <LogOut className="w-4 h-4" />
@@ -224,66 +221,66 @@ export const StudentDashboardPage: React.FC = () => {
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 sm:space-y-12">
+      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
         {/* 2. Overview Summary Metrics (Actual Database Values) */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
           {/* Metric 1: Available Subjects */}
           <Link
             to="/subjects"
-            className="p-5 rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-subtle hover:border-brand-500/50 hover:shadow-sm transition-all group"
+            className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-subtle hover:border-brand-500/50 hover:shadow-sm transition-all group"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 leading-tight truncate">
                 Available Subjects
               </span>
-              <div className="p-2 rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400 group-hover:scale-110 transition-transform">
-                <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400 group-hover:scale-110 transition-transform shrink-0">
+                <BookOpen className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
               </div>
             </div>
-            <div className="mt-3">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+            <div className="mt-2 sm:mt-3">
+              <span className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-white">
                 {subjectsLoading ? '...' : totalSubjectsCount}
               </span>
-              <span className="text-xs text-slate-400 block mt-0.5">Enrolled courses</span>
+              <span className="text-[10px] sm:text-xs text-slate-400 block mt-0.5 truncate">Enrolled courses</span>
             </div>
           </Link>
 
           {/* Metric 2: Total Learning Materials */}
           <Link
             to="/search"
-            className="p-5 rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-subtle hover:border-indigo-500/50 hover:shadow-sm transition-all group"
+            className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-subtle hover:border-indigo-500/50 hover:shadow-sm transition-all group"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 leading-tight truncate">
                 Total Materials
               </span>
-              <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
-                <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform shrink-0">
+                <Layers className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
               </div>
             </div>
-            <div className="mt-3">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+            <div className="mt-2 sm:mt-3">
+              <span className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-white">
                 {resourcesLoading ? '...' : totalResourcesCount}
               </span>
-              <span className="text-xs text-slate-400 block mt-0.5">Notes, videos & slides</span>
+              <span className="text-[10px] sm:text-xs text-slate-400 block mt-0.5 truncate">Notes, videos & slides</span>
             </div>
           </Link>
 
           {/* Metric 3: New Materials (Past 7 Days) */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-subtle">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-subtle">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 leading-tight truncate">
                 New Materials
               </span>
-              <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Sparkles className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
               </div>
             </div>
-            <div className="mt-3">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+            <div className="mt-2 sm:mt-3">
+              <span className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-white">
                 {resourcesLoading ? '...' : newMaterialsCount}
               </span>
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium block mt-0.5">
+              <span className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 font-medium block mt-0.5 truncate">
                 Past 7 days
               </span>
             </div>
@@ -292,21 +289,21 @@ export const StudentDashboardPage: React.FC = () => {
           {/* Metric 4: Announcements */}
           <Link
             to="/announcements"
-            className="p-5 rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-subtle hover:border-amber-500/50 hover:shadow-sm transition-all group"
+            className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-subtle hover:border-amber-500/50 hover:shadow-sm transition-all group"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 leading-tight truncate">
                 Announcements
               </span>
-              <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform">
-                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform shrink-0">
+                <Bell className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
               </div>
             </div>
-            <div className="mt-3">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+            <div className="mt-2 sm:mt-3">
+              <span className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-white">
                 {announcementsLoading ? '...' : announcements.length}
               </span>
-              <span className="text-xs text-slate-400 block mt-0.5">
+              <span className="text-[10px] sm:text-xs text-slate-400 block mt-0.5 truncate">
                 {unreadAnnouncementsCount > 0 ? (
                   <strong className="text-brand-600 dark:text-brand-400">
                     {unreadAnnouncementsCount} unread
@@ -320,17 +317,17 @@ export const StudentDashboardPage: React.FC = () => {
         </section>
 
         {/* Quick Search Field across all subjects & materials */}
-        <section className="bg-white dark:bg-navy-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-subtle">
-          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
-            <Search className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 ml-2 shrink-0" />
+        <section className="bg-white dark:bg-navy-900 p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 shadow-subtle">
+          <form onSubmit={handleSearchSubmit} className="flex items-center gap-1.5 sm:gap-2 w-full min-w-0">
+            <Search className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 ml-1.5 sm:ml-2 shrink-0" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Quick search lessons by topic, title, chapter, or subject code..."
-              className="w-full px-2 py-1.5 text-xs sm:text-sm bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
+              placeholder="Search lessons by topic, title, chapter..."
+              className="w-full min-w-0 flex-1 px-2 py-1.5 text-xs sm:text-sm bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
             />
-            <Button type="submit" size="sm" variant="primary" className="font-semibold shrink-0">
+            <Button type="submit" size="sm" variant="primary" className="font-semibold shrink-0 text-xs px-3 py-1.5 h-8">
               Search
             </Button>
           </form>
@@ -340,24 +337,24 @@ export const StudentDashboardPage: React.FC = () => {
         {pinnedAnnouncement && (
           <aside
             aria-label="Important Notice"
-            className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-navy-900 to-indigo-950 text-white shadow-card border border-slate-800 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap"
+            className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-navy-900 to-indigo-950 text-white shadow-card border border-slate-800 flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4 min-w-0"
           >
-            <div className="flex items-start gap-3.5">
-              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-300 shrink-0 mt-0.5">
-                <Bell className="w-5 h-5" />
+            <div className="flex items-start gap-3 sm:gap-3.5 min-w-0">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/20 text-amber-300 shrink-0 mt-0.5">
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   {pinnedAnnouncement.is_pinned && (
                     <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-amber-500 text-slate-950">
                       Important Notice
                     </span>
                   )}
-                  <h3 className="text-sm sm:text-base font-bold text-white">
+                  <h3 className="text-sm sm:text-base font-bold text-white break-words">
                     {pinnedAnnouncement.title}
                   </h3>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-4xl line-clamp-3">
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-4xl line-clamp-3 break-words">
                   {pinnedAnnouncement.body}
                 </p>
                 <span className="text-[11px] text-slate-400 block pt-1">
@@ -368,7 +365,7 @@ export const StudentDashboardPage: React.FC = () => {
 
             <Link
               to="/announcements"
-              className="text-xs font-bold text-brand-400 hover:text-brand-300 underline shrink-0 self-center"
+              className="text-xs font-bold text-brand-400 hover:text-brand-300 underline shrink-0 sm:self-center"
             >
               View All Announcements &rarr;
             </Link>
@@ -611,9 +608,9 @@ export const StudentDashboardPage: React.FC = () => {
         </section>
 
         {/* 7. Need Help or Missing Notes Banner */}
-        <section className="p-6 sm:p-8 rounded-3xl bg-slate-900 text-white shadow-card border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="space-y-1.5 max-w-xl">
-            <h4 className="text-lg font-bold text-white">
+        <section className="p-4 sm:p-8 rounded-2xl sm:rounded-3xl bg-slate-900 text-white shadow-card border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 min-w-0">
+          <div className="space-y-1.5 max-w-xl min-w-0">
+            <h4 className="text-base sm:text-lg font-bold text-white break-words">
               Need a Missing Handout or Chapter Diagram?
             </h4>
             <p className="text-xs text-slate-300 leading-relaxed">
@@ -621,18 +618,18 @@ export const StudentDashboardPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
             <button
               type="button"
               onClick={() => setContactModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition-all cursor-pointer"
             >
-              <MessageCircle className="w-4 h-4 fill-current" />
+              <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" />
               <span>WhatsApp Muhammad Hammad</span>
             </button>
 
             <Link to="/chat">
-              <Button size="sm" variant="outline" className="font-bold text-white border-slate-700 hover:bg-slate-800">
+              <Button size="sm" variant="outline" className="font-bold text-white border-slate-700 hover:bg-slate-800 text-xs py-2">
                 Class Chat
               </Button>
             </Link>

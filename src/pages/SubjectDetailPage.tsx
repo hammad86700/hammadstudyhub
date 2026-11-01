@@ -145,7 +145,7 @@ export const SubjectDetailPage: React.FC = () => {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 sm:space-y-8 w-full max-w-full overflow-x-hidden">
       <SEOHead
         title={`${subject.name} (${subject.code}) — Study Resources`}
         description={subject.description || `Browse daily lecture notes, whiteboard photos, and past papers for ${subject.name}.`}
@@ -154,7 +154,7 @@ export const SubjectDetailPage: React.FC = () => {
       <Breadcrumb items={breadcrumbs} />
 
       {/* Subject Header Banner */}
-      <header className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-subtle space-y-4">
+      <header className="p-4 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-subtle space-y-4 min-w-0">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-md bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-200 dark:border-brand-800">

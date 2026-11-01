@@ -222,8 +222,8 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
 
           {/* Attached File Badge (if uploaded from system) */}
           {resource.file_name && (
-            <div className="mt-1 flex items-center gap-1.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
-              <span className="truncate max-w-[220px]">📄 {resource.file_name}</span>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] font-mono text-slate-500 dark:text-slate-400 min-w-0">
+              <span className="truncate max-w-[170px] sm:max-w-[220px]">📄 {resource.file_name}</span>
               {resource.file_size && <span className="opacity-75 shrink-0">({resource.file_size})</span>}
             </div>
           )}
@@ -268,18 +268,18 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
       </div>
 
       {/* Footer Actions: Lesson Date & 2 Student Options (View Online vs Download) */}
-      <div className="px-3.5 sm:px-4 py-2.5 bg-slate-50/70 dark:bg-navy-950/60 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs gap-2 flex-wrap">
+      <div className="px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-50/70 dark:bg-navy-950/60 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs gap-1.5 sm:gap-2 flex-wrap min-w-0">
         <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium shrink-0">
           <Calendar className="w-3.5 h-3.5 text-brand-500" />
           <span>{formatLessonDate(resource.lesson_date, { format: 'short' })}</span>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* OPTION 1: Open / View Directly (without download) */}
           <button
             type="button"
             onClick={handleOpenOnlineClick}
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+            className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
               isLoggedIn
                 ? 'text-brand-700 dark:text-brand-300 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800'
                 : 'text-slate-500 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
@@ -294,7 +294,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
           <button
             type="button"
             onClick={handleDownloadClick}
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-2xs cursor-pointer ${
+            className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-colors shadow-2xs cursor-pointer shrink-0 ${
               isLoggedIn
                 ? 'text-white bg-brand-600 hover:bg-brand-700'
                 : 'text-brand-700 dark:text-brand-300 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800'
@@ -308,7 +308,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
           {/* Full Viewer Link */}
           <Link
             to={`/resources/${resource.slug || resource.id}`}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 text-xs"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 text-xs shrink-0"
             title="Open in Full Study Viewer"
           >
             <ExternalLink className="w-3.5 h-3.5" />

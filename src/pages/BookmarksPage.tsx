@@ -75,7 +75,7 @@ export const BookmarksPage: React.FC = () => {
   const completedChecklist = checklist.filter((c) => c.isCompleted);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-6">
+    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-12 space-y-6 w-full max-w-full overflow-x-hidden">
       <SEOHead
         title={activeTab === 'bookmarks' ? 'Saved Bookmarks' : 'Study Revision Checklist'}
         description="Quick access to all your locally saved study resources and revision progress."

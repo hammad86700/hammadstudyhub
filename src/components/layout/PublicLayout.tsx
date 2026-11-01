@@ -14,7 +14,7 @@ export const PublicLayout: React.FC = () => {
   const { isDemoMode } = useAuth();
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-navy-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-navy-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 w-full max-w-full overflow-x-hidden">
       <PwaInstallBanner />
 
       {/* Demo Mode Notice Banner (Only shown when live Supabase is not yet configured) */}
@@ -39,7 +39,7 @@ export const PublicLayout: React.FC = () => {
 
       <Navbar />
 
-      <main className="flex-1">
+      <main className="flex-1 w-full max-w-full overflow-x-hidden">
         <Outlet />
       </main>
 

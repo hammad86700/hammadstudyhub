@@ -90,14 +90,14 @@ export const Navbar: React.FC = () => {
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-navy-950/95 backdrop-blur-md transition-colors duration-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
             {/* Logo & Brand Mark */}
-            <Link to={isLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-3 shrink-0 group focus:outline-none">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-600 to-navy-900 p-0.5 shadow-sm group-hover:shadow transition-shadow">
-                <div className="w-full h-full rounded-[10px] bg-slate-900 flex items-center justify-center">
+            <Link to={isLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-2 sm:gap-3 min-w-0 group focus:outline-none">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-brand-600 to-navy-900 p-0.5 shadow-sm group-hover:shadow transition-shadow shrink-0">
+                <div className="w-full h-full rounded-[9px] sm:rounded-[10px] bg-slate-900 flex items-center justify-center">
                   <svg
-                    className="w-6 h-6 text-brand-400 group-hover:scale-105 transition-transform"
+                    className="w-4 h-4 sm:w-6 sm:h-6 text-brand-400 group-hover:scale-105 transition-transform"
                     viewBox="0 0 512 512"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -109,11 +109,11 @@ export const Navbar: React.FC = () => {
                   </svg>
                 </div>
               </div>
-              <div>
-                <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
+              <div className="min-w-0">
+                <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 dark:text-white truncate block">
                   Hammad StudyHub
                 </span>
-                <span className="block text-[10px] font-medium tracking-wide text-brand-600 dark:text-brand-400 uppercase">
+                <span className="block text-[9px] sm:text-[10px] font-medium tracking-wide text-brand-600 dark:text-brand-400 uppercase truncate">
                   By Muhammad Hammad
                 </span>
               </div>
@@ -142,7 +142,7 @@ export const Navbar: React.FC = () => {
             </nav>
 
             {/* Actions: Contact Admin, Search, Bookmarks, Theme Toggle, Auth */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               {/* Direct Contact Admin WhatsApp / Instagram Trigger */}
               <button
                 onClick={() => setContactModalOpen(true)}
@@ -156,7 +156,7 @@ export const Navbar: React.FC = () => {
               {/* Quick Search Trigger */}
               <button
                 onClick={() => setSearchOpen(!searchOpen)}
-                className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
+                className="p-1.5 sm:p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
                 aria-label="Open search"
               >
                 <Search className="w-4 h-4" />
@@ -165,7 +165,7 @@ export const Navbar: React.FC = () => {
               {/* Bookmarks Counter */}
               <Link
                 to="/bookmarks"
-                className={`relative p-2 rounded-lg transition-colors ${
+                className={`relative p-1.5 sm:p-2 rounded-lg transition-colors ${
                   isActive('/bookmarks')
                     ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
@@ -187,7 +187,7 @@ export const Navbar: React.FC = () => {
               {/* Dark Mode Toggle */}
               <button
                 onClick={toggleTheme}
-                className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
+                className="p-1.5 sm:p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
                 aria-label="Toggle theme"
               >
                 {resolvedTheme === 'dark' ? (
@@ -219,7 +219,7 @@ export const Navbar: React.FC = () => {
 
                   <button
                     onClick={() => signOut()}
-                    className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                    className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                     title="Sign Out"
                   >
                     <LogOut className="w-4 h-4" />
@@ -246,7 +246,7 @@ export const Navbar: React.FC = () => {
               {/* Mobile Hamburger Menu */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
+                className="md:hidden p-1.5 sm:p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
                 aria-label="Toggle mobile menu"
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

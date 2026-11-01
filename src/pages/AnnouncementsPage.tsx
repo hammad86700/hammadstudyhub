@@ -27,7 +27,7 @@ export const AnnouncementsPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-6">
+    <div className="max-w-4xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-12 space-y-6 w-full max-w-full overflow-x-hidden">
       <SEOHead
         title="Announcements & Study Notices"
         description="Stay updated with class schedules, mid-term notifications, assignment deadlines, and academic notices on Hammad StudyHub."
