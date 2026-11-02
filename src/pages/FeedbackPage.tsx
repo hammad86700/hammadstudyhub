@@ -74,7 +74,7 @@ export const FeedbackPage: React.FC = () => {
               onChange={(e) => setCategory(e.target.value as any)}
               options={[
                 { value: 'general', label: 'General Feedback or Suggestion' },
-                { value: 'broken_link', label: 'Report Broken Google Drive Link' },
+                { value: 'broken_link', label: 'Report Broken Material / Document Link' },
                 { value: 'resource_request', label: 'Request Missing Subject / Lecture Notes' },
                 { value: 'correction', label: 'Report Typo or Note Correction' },
                 { value: 'other', label: 'Other Support Inquiry' },

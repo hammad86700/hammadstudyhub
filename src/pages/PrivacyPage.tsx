@@ -49,10 +49,10 @@ export const PrivacyPage: React.FC = () => {
         <Card className="p-6 space-y-3">
           <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Database className="w-4 h-4 text-indigo-500" />
-            <span>3. External Document Links (Google Drive & YouTube)</span>
+            <span>3. External Document Links & Media</span>
           </h2>
           <p>
-            When viewing study materials hosted on Google Drive or watching embedded YouTube lectures, interactions are governed by Google Privacy Policies. Hammad StudyHub does not inject advertising or malicious trackers into external document frames.
+            When viewing study materials and documents or watching embedded video lectures, interactions are kept safe and secure. Hammad StudyHub does not inject advertising or malicious trackers into external frames.
           </p>
         </Card>
       </div>

@@ -82,7 +82,7 @@ export const AboutPage: React.FC = () => {
           <span>Academic Integrity & Distribution Policy</span>
         </div>
         <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-          Hammad StudyHub distributes learning resources strictly for educational, non-commercial purposes. Study notes, whiteboard diagrams, and model questions are compiled to facilitate academic comprehension. All document sharing permissions are managed via Google Drive with public view settings. If you believe any material requires updating or permission review, please submit a notice through our <Link to="/feedback" className="text-brand-600 dark:text-brand-400 underline font-semibold">Feedback & Report form</Link>.
+          Hammad StudyHub distributes learning resources strictly for educational, non-commercial purposes. Study notes, whiteboard diagrams, and model questions are compiled to facilitate academic comprehension. All document sharing permissions and file access are managed directly through our secure platform storage. If you believe any material requires updating or review, please submit a notice through our <Link to="/feedback" className="text-brand-600 dark:text-brand-400 underline font-semibold">Feedback & Report form</Link>.
         </p>
       </Card>
     </div>

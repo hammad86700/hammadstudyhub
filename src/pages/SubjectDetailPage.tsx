@@ -167,18 +167,6 @@ export const SubjectDetailPage: React.FC = () => {
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {subject.google_drive_folder_url && (
-              <a
-                href={subject.google_drive_folder_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-semibold transition-colors"
-                title="Open this subject folder in Google Drive"
-              >
-                <span>📁 Course Drive Folder</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            )}
             <button
               onClick={() => setContactModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold transition-colors"
@@ -235,19 +223,6 @@ export const SubjectDetailPage: React.FC = () => {
             >
               Add Notes / PDF
             </Button>
-
-            {subject.google_drive_folder_url && (
-              <a
-                href={subject.google_drive_folder_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-navy-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 transition-colors ml-auto"
-                title="Open external backup folder"
-              >
-                <span>External Backup</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            )}
           </div>
         )}
       </header>

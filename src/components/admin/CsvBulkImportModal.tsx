@@ -38,7 +38,7 @@ export const CsvBulkImportModal: React.FC<CsvBulkImportModalProps> = ({
   };
 
   const handleDownloadSample = () => {
-    const sample = `Title,Subject,Type,Lesson Date,Topic,Chapter,Tags,Status,External URL\n"Lesson 01: Introduction","Computer Programming",pdf,2026-10-25,"Basic Concepts","Chapter 1","intro;c++",published,"https://drive.google.com/file/d/1sample_drive_link_here/view"\n"Lesson 02: Loops & Control Flow","Computer Programming",whiteboard,2026-10-27,"Loops Practice","Chapter 2","loops;diagrams",published,"https://drive.google.com/file/d/1sample_whiteboard_link/view"`;
+    const sample = `Title,Subject,Type,Lesson Date,Topic,Chapter,Tags,Status,External URL\n"Lesson 01: Introduction","Computer Programming",pdf,2026-10-25,"Basic Concepts","Chapter 1","intro;c++",published,"https://studyhub.local/files/lesson-01.pdf"\n"Lesson 02: Loops & Control Flow","Computer Programming",whiteboard,2026-10-27,"Loops Practice","Chapter 2","loops;diagrams",published,"https://studyhub.local/files/lesson-02.jpg"`;
     const blob = new Blob([sample], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -68,7 +68,7 @@ export const CsvBulkImportModal: React.FC<CsvBulkImportModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Bulk Import Resources (CSV)"
-      description="Quickly import multiple lesson resources, Google Drive links, and dates at once."
+      description="Quickly import multiple lesson resources, material download links, and dates at once."
       maxWidth="4xl"
     >
       {step === 'input' ? (
@@ -112,7 +112,7 @@ export const CsvBulkImportModal: React.FC<CsvBulkImportModalProps> = ({
               rows={8}
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
-              placeholder={`Title,Subject,Type,Lesson Date,Topic,Chapter,Tags,Status,External URL\n"Lesson 01 Notes","Computer Programming",pdf,2026-10-25,"Intro","Ch1","c++",published,"https://drive.google.com/file/d/..."`}
+              placeholder={`Title,Subject,Type,Lesson Date,Topic,Chapter,Tags,Status,External URL\n"Lesson 01 Notes","Computer Programming",pdf,2026-10-25,"Intro","Ch1","c++",published,"https://studyhub.local/files/notes-01.pdf"`}
               className="w-full p-3 font-mono text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-navy-950 text-slate-900 dark:text-slate-100"
             />
           </div>

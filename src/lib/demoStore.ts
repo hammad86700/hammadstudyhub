@@ -748,6 +748,42 @@ export function mergeChatsLocally(remoteList: ChatMessage[]): ChatMessage[] {
   return merged;
 }
 
+export function markConversationAsRead(currentUserId: string, contactId: string): void {
+  if (!currentUserId || !contactId) return;
+  const all = getAllChatMessages();
+  let changed = false;
+  all.forEach((m) => {
+    if (m.receiver_id === currentUserId && m.sender_id === contactId && !m.read) {
+      m.read = true;
+      changed = true;
+    }
+  });
+  if (changed) {
+    setStored(CHATS_KEY, all);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('studyhub_chat_updated'));
+    }
+  }
+}
+
+export function getUnreadChatCount(userId: string): number {
+  if (!userId) return 0;
+  const all = getAllChatMessages();
+  return all.filter((m) => m.receiver_id === userId && !m.read).length;
+}
+
+export function getUnreadCountForConversation(currentUserId: string, contactId: string): number {
+  if (!currentUserId || !contactId) return 0;
+  const all = getAllChatMessages();
+  return all.filter((m) => m.receiver_id === currentUserId && m.sender_id === contactId && !m.read).length;
+}
+
+export function getLastMessageForConversation(userId1: string, userId2: string): ChatMessage | undefined {
+  if (!userId1 || !userId2) return undefined;
+  const conv = getConversationMessages(userId1, userId2);
+  return conv.length > 0 ? conv[conv.length - 1] : undefined;
+}
+
 export function getSharedMaterialsBetween(userId1: string, userId2: string): SharedMaterialAttachment[] {
   const msgs = getConversationMessages(userId1, userId2);
   const attachments: SharedMaterialAttachment[] = [];

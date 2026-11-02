@@ -314,5 +314,51 @@ describe('In-Platform Messaging & Gender-Aware Rules', () => {
     expect(stored).toBeDefined();
     expect(stored?.file_data).toBe('data:application/pdf;base64,JVBERi0xLjQKJ...');
   });
+
+  it('accurately tracks unread counts and marks conversations as read', async () => {
+    const { markConversationAsRead, getUnreadChatCount, getUnreadCountForConversation, getLastMessageForConversation } = await import('../lib/demoStore');
+
+    // Student sends message to Admin
+    sendChatMessage({
+      sender_id: 'std_boy_01',
+      sender_name: 'Ahmed Student',
+      sender_role: 'student',
+      sender_gender: 'male',
+      receiver_id: 'admin_user',
+      receiver_name: 'Muhammad Hammad',
+      receiver_role: 'admin',
+      message: 'Hello Admin, when will midterm results be posted?',
+    });
+
+    // CR also sends message to Admin
+    sendChatMessage({
+      sender_id: 'cr_user_01',
+      sender_name: 'Bilal CR',
+      sender_role: 'cr',
+      sender_gender: 'male',
+      receiver_id: 'admin_user',
+      receiver_name: 'Muhammad Hammad',
+      receiver_role: 'admin',
+      message: 'Admin, syllabus for Discrete Math is finalized.',
+    });
+
+    // Total unread for Admin should be 2
+    expect(getUnreadChatCount('admin_user')).toBe(2);
+    expect(getUnreadCountForConversation('admin_user', 'std_boy_01')).toBe(1);
+    expect(getUnreadCountForConversation('admin_user', 'cr_user_01')).toBe(1);
+
+    // Verify last message retrieval
+    const lastMsg = getLastMessageForConversation('admin_user', 'cr_user_01');
+    expect(lastMsg?.message).toBe('Admin, syllabus for Discrete Math is finalized.');
+
+    // Admin opens conversation with CR
+    markConversationAsRead('admin_user', 'cr_user_01');
+    expect(getUnreadCountForConversation('admin_user', 'cr_user_01')).toBe(0);
+    expect(getUnreadChatCount('admin_user')).toBe(1); // Student's message is still unread
+
+    // Admin opens conversation with student
+    markConversationAsRead('admin_user', 'std_boy_01');
+    expect(getUnreadChatCount('admin_user')).toBe(0);
+  });
 });
 

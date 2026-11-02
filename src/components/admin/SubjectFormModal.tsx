@@ -208,32 +208,6 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
           {...register('description')}
         />
 
-        {/* External Drive Link (Optional) */}
-        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-navy-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FolderCheck className="w-4 h-4 text-brand-600" />
-              <label className="text-xs font-bold text-slate-900 dark:text-white">
-                External Cloud Folder Link (Optional)
-              </label>
-            </div>
-            {isFolderLockedForCR && (
-              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <ShieldAlert className="w-3 h-3" />
-                <span>Admin Managed</span>
-              </span>
-            )}
-          </div>
-          <Input
-            type="text"
-            disabled={isFolderLockedForCR}
-            placeholder="https://drive.google.com/drive/folders/... (Optional backup link)"
-            helperText="Optional external folder link. Files will automatically be stored in StudyHub system cloud storage regardless."
-            error={errors.google_drive_folder_url?.message}
-            {...register('google_drive_folder_url')}
-          />
-        </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">

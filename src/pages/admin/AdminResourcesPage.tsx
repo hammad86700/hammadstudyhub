@@ -133,7 +133,7 @@ export const AdminResourcesPage: React.FC = () => {
             Resource Management
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Publish notes, whiteboard photos, manage Google Drive sharing, and edit lesson dates.
+            Publish notes, whiteboard photos, manage learning resources, and edit lesson dates.
           </p>
         </div>
 

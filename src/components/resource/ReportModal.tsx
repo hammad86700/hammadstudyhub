@@ -54,7 +54,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Report Resource or Link Issue"
-      description="Let us know if a Google Drive link requires permissions, a video is unavailable, or notes contain an error."
+      description="Let us know if a study material link requires attention, a video is unavailable, or notes contain an error."
     >
       {isSuccess ? (
         <div className="py-6 flex flex-col items-center justify-center text-center space-y-2">
@@ -78,7 +78,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             value={category}
             onChange={(e) => setCategory(e.target.value as any)}
             options={[
-              { value: 'broken_link', label: 'Broken or Inaccessible Google Drive Link' },
+              { value: 'broken_link', label: 'Broken or Inaccessible Material Link' },
               { value: 'correction', label: 'Correction / Typo in Study Material' },
               { value: 'resource_request', label: 'Missing Notes / Additional Chapter Request' },
               { value: 'other', label: 'Other Issue' },
@@ -91,7 +91,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             rows={4}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="e.g. The Google Drive file says 'Access Denied: You need permission' when attempting to open..."
+            placeholder="e.g. The study material says 'Access Denied: You need permission' or the document link does not open..."
           />
 
           <Input

@@ -355,7 +355,7 @@ export const HomePage: React.FC = () => {
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               No more searching through lost chat messages or unorganized folders.
-              Find your lecture by exact calendar date, view Google Drive documents without leaving the browser, and bookmark revision materials effortlessly.
+              Find your lecture by exact calendar date, view study documents without leaving the browser, and bookmark revision materials effortlessly.
             </p>
             <div className="pt-2 flex items-center gap-4 flex-wrap">
               <Link to="/subjects">

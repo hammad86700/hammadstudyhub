@@ -124,7 +124,7 @@ export const PublicHomePage: React.FC = () => {
 
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               Every semester, students struggle with scattered study files: lecture slides lost inside buried WhatsApp group chats,
-              broken Google Drive permissions, missing whiteboard photos before exams, and confusion about what was taught on any given day.
+              broken document permissions, missing whiteboard photos before exams, and confusion about what was taught on any given day.
             </p>
 
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -177,7 +177,7 @@ export const PublicHomePage: React.FC = () => {
                     3
                   </div>
                   <p>
-                    <strong className="text-white">Reliable Backup Storage:</strong> Files are stored safely in cloud storage, free from expired link errors or Google Drive storage limitations.
+                    <strong className="text-white">Reliable Cloud Storage:</strong> Files are stored safely in system cloud storage, free from expired link errors or external storage limitations.
                   </p>
                 </div>
               </div>

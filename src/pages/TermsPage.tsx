@@ -40,7 +40,7 @@ export const TermsPage: React.FC = () => {
             2. Intellectual Property & Academic Distribution
           </h2>
           <p>
-            Study notes, whiteboard illustrations, and presentations remain the intellectual property of their respective creators and instructors. Materials shared via Google Drive are intended for authorized academic study. If an authorized rights holder desires a link modified or removed, submit a notice via the Feedback page and it will be addressed promptly.
+            Study notes, whiteboard illustrations, and presentations remain the intellectual property of their respective creators and instructors. Materials shared across the platform are intended for authorized academic study. If an authorized rights holder desires a link or resource modified or removed, submit a notice via the Feedback page and it will be addressed promptly.
           </p>
         </Card>
 

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { getUnreadChatCount } from '../../lib/demoStore';
 import { Button } from '../common/Button';
 
 export const AdminLayout: React.FC = () => {
@@ -34,6 +35,21 @@ export const AdminLayout: React.FC = () => {
   const { resolvedTheme, toggleTheme } = useTheme();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const location = useLocation();
+
+  const [unreadChatCount, setUnreadChatCount] = useState(() =>
+    profile ? getUnreadChatCount(profile.id) : 0
+  );
+
+  React.useEffect(() => {
+    const handleChatChange = () => {
+      if (profile) {
+        setUnreadChatCount(getUnreadChatCount(profile.id));
+      }
+    };
+    handleChatChange();
+    window.addEventListener('studyhub_chat_updated', handleChatChange);
+    return () => window.removeEventListener('studyhub_chat_updated', handleChatChange);
+  }, [profile]);
 
   if (isLoading) {
     return (
@@ -158,10 +174,17 @@ export const AdminLayout: React.FC = () => {
           {/* Quick Chat Link */}
           <NavLink
             to="/chat"
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+            className="flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
           >
-            <MessageSquare className="w-4 h-4 shrink-0 text-brand-400" />
-            <span>Class Messages / Chat</span>
+            <div className="flex items-center gap-2.5">
+              <MessageSquare className="w-4 h-4 shrink-0 text-brand-400" />
+              <span>Class Messages / Chat</span>
+            </div>
+            {unreadChatCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-brand-600 text-white animate-pulse">
+                {unreadChatCount}
+              </span>
+            )}
           </NavLink>
         </nav>
 
