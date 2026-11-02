@@ -197,14 +197,14 @@ export async function resolveFileAccessUrl(resource: Resource): Promise<string> 
 }
 
 /**
- * Checks whether the 'studyhub-materials' storage bucket exists in Supabase
+ * Checks whether the 'studyhub-materials' storage bucket exists and is accessible in Supabase
  */
 export async function checkStorageBucketExists(): Promise<{ exists: boolean; error?: string }> {
   if (!isSupabaseConfigured) return { exists: false, error: 'Supabase is not configured' };
   try {
-    const { data, error } = await supabase.storage.getBucket(STORAGE_BUCKET);
-    if (error || !data) {
-      return { exists: false, error: error?.message || 'Bucket not found' };
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).list('', { limit: 1 });
+    if (error) {
+      return { exists: false, error: error.message };
     }
     return { exists: true };
   } catch (err: any) {
