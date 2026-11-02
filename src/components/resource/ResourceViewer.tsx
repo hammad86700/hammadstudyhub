@@ -25,6 +25,10 @@ import {
   Archive,
   Presentation,
   FileSpreadsheet,
+  Maximize2,
+  Minimize2,
+  BookOpen,
+  Monitor,
 } from 'lucide-react';
 import { Resource } from '../../types';
 import { formatLessonDate, formatRelativeTime, getResourceTypeMeta } from '../../lib/utils';
@@ -62,6 +66,18 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
   const [isLoadingFile, setIsLoadingFile] = useState<boolean>(
     !initialCleanData && Boolean(resource.file_name || resource.id)
   );
+  const [viewerMode, setViewerMode] = useState<'reader' | 'stream'>('reader');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -163,7 +179,11 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
 
   const handleOpenOnlineClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    openResourceOnline(resource);
+    if (onlineReaderUrl) {
+      window.open(onlineReaderUrl, '_blank');
+    } else {
+      openResourceOnline(resource);
+    }
   };
 
   const handleDownloadClick = (e: React.MouseEvent) => {
@@ -178,6 +198,24 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
 
   const isOfficeFile = isOfficeDocument(resource.file_name, resource.mime_type);
   const isZipFile = resource.mime_type?.includes('zip') || Boolean(resource.file_name?.match(/\.(zip|rar|7z|tar|gz)$/i));
+  const isPdf = resource.resource_type === 'pdf' || Boolean(resource.file_name?.match(/\.pdf$/i));
+  const isPresentation = resource.resource_type === 'presentation' || Boolean(resource.file_name?.match(/\.(ppt|pptx)$/i));
+  const isDocument = isPdf || isOfficeFile || isPresentation;
+
+  const isCdnUrl = Boolean(
+    directTargetUrl &&
+    directTargetUrl.startsWith('http') &&
+    !directTargetUrl.includes('/api/files')
+  );
+
+  // Online reader URL: renders page-by-page directly on screen on all devices (mobile + desktop) without downloading
+  const onlineReaderUrl = isCdnUrl && isDocument
+    ? `https://docs.google.com/viewer?url=${encodeURIComponent(directTargetUrl)}&embedded=true`
+    : null;
+
+  const activeViewerSrc = viewerMode === 'reader' && onlineReaderUrl
+    ? onlineReaderUrl
+    : (activeFileData || directTargetUrl || '');
 
   const breadcrumbs = [
     { label: 'Subjects', href: '/subjects' },
@@ -310,27 +348,86 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
       </div>
 
       {/* Embedded Document / Video Viewer Container */}
-      <div className="bg-white dark:bg-navy-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-card">
+      <div
+        className={
+          isFullscreen
+            ? 'fixed inset-0 z-50 bg-slate-950 p-2 sm:p-4 flex flex-col'
+            : 'bg-white dark:bg-navy-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-card'
+        }
+      >
         {/* Viewer Top Action Bar */}
-        <div className="px-5 py-3.5 bg-slate-50 dark:bg-navy-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+        <div className="px-4 sm:px-5 py-3 bg-slate-50 dark:bg-navy-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
             {meta.label} Preview
-            <span className="text-slate-400 font-normal">
-              ({resource.file_data ? 'System Cloud Storage' : resource.source_provider === 'youtube' ? 'YouTube Player' : 'Direct Host'})
-            </span>
+            {onlineReaderUrl ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <BookOpen className="w-3 h-3" /> Direct In-App Reader
+              </span>
+            ) : (
+              <span className="text-slate-400 font-normal">
+                ({resource.file_data ? 'System Cloud Storage' : resource.source_provider === 'youtube' ? 'YouTube Player' : 'Direct Host'})
+              </span>
+            )}
           </div>
 
-          {/* Student 2-Option Toolbar: View Online vs Download */}
-          <div className="flex items-center gap-2">
-            {/* OPTION 1: View Online (without download) */}
+          {/* Student Controls: Reader Switcher, Fullscreen, Open in Tab, Download */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            {/* Mode Switcher (if online reader URL available) */}
+            {onlineReaderUrl && (
+              <div className="inline-flex items-center rounded-lg bg-slate-200/80 dark:bg-slate-800 p-0.5 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setViewerMode('reader')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                    viewerMode === 'reader'
+                      ? 'bg-white dark:bg-navy-900 text-brand-600 dark:text-brand-400 shadow-2xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                  title="Interactive Page Reader (view online directly without download)"
+                >
+                  <BookOpen className="w-3 h-3" />
+                  <span>Reader</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewerMode('stream')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                    viewerMode === 'stream'
+                      ? 'bg-white dark:bg-navy-900 text-brand-600 dark:text-brand-400 shadow-2xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                  title="Direct native file stream"
+                >
+                  <Monitor className="w-3 h-3" />
+                  <span>Stream</span>
+                </button>
+              </div>
+            )}
+
+            {/* Fullscreen Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+              title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Expand Fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-3.5 h-3.5 text-amber-500" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
+              )}
+              <span className="hidden sm:inline">{isFullscreen ? 'Exit Full' : 'Fullscreen'}</span>
+            </button>
+
+            {/* OPTION 1: View Online (Dedicated Tab) */}
             <button
               type="button"
               onClick={handleOpenOnlineClick}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
-              title="Open directly in browser tab to read online"
+              title="Open reader in a full new browser tab"
             >
-              <Eye className="w-3.5 h-3.5 text-brand-500" />
-              <span>View Online</span>
+              <ExternalLink className="w-3.5 h-3.5 text-brand-500" />
+              <span>New Tab</span>
             </button>
 
             {/* OPTION 2: Download File */}
@@ -341,35 +438,31 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
               title="Download file directly to your computer or phone"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Download File</span>
+              <span>Download</span>
             </button>
           </div>
         </div>
 
         {/* Embed Frame or Media Player */}
-        <div className="relative bg-slate-900 min-h-[420px] sm:min-h-[560px] flex items-center justify-center p-2 sm:p-4">
+        <div
+          className={`relative bg-slate-900 flex items-center justify-center p-2 sm:p-3 ${
+            isFullscreen ? 'flex-1 h-full' : 'min-h-[440px] sm:min-h-[640px]'
+          }`}
+        >
           {/* Image files */}
           {isImageFile && (activeFileData || (directTargetUrl && !directTargetUrl.includes('/api/files') && directTargetUrl !== '#')) ? (
             <div className="flex flex-col items-center justify-center max-w-full">
               <img
                 src={activeFileData || directTargetUrl}
                 alt={resource.title}
-                className="max-w-full max-h-[640px] rounded-lg shadow-md object-contain bg-slate-950"
+                className="max-w-full max-h-[85vh] rounded-lg shadow-md object-contain bg-slate-950"
               />
             </div>
-          ) : isOfficeFile || isZipFile ? (
-            /* Office documents (DOCX, PPTX, XLSX) and ZIP packages */
+          ) : isZipFile ? (
+            /* Compressed ZIP packages */
             <div className="p-8 text-center text-white space-y-5 max-w-lg">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-800/90 border border-slate-700 flex items-center justify-center text-brand-400 shadow-lg">
-                {isZipFile ? (
-                  <Archive className="w-8 h-8 text-indigo-400" />
-                ) : resource.file_name?.match(/\.(ppt|pptx)$/i) ? (
-                  <Presentation className="w-8 h-8 text-amber-400" />
-                ) : resource.file_name?.match(/\.(xls|xlsx)$/i) ? (
-                  <FileSpreadsheet className="w-8 h-8 text-emerald-400" />
-                ) : (
-                  <FileText className="w-8 h-8 text-blue-400" />
-                )}
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-800/90 border border-slate-700 flex items-center justify-center text-indigo-400 shadow-lg">
+                <Archive className="w-8 h-8" />
               </div>
 
               <div>
@@ -377,27 +470,18 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
                   {resource.file_name || resource.title}
                 </h4>
                 <p className="text-xs text-slate-400 mt-1">
-                  Academic learning document {resource.file_size && `• ${resource.file_size}`}
+                  Compressed Archive Package {resource.file_size && `• ${resource.file_size}`}
                 </p>
               </div>
 
               <div className="flex items-center justify-center gap-3 flex-wrap pt-2">
                 <button
                   type="button"
-                  onClick={handleOpenOnlineClick}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors cursor-pointer"
-                >
-                  <Eye className="w-4 h-4 text-brand-400" />
-                  <span>Open Preview</span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={handleDownloadClick}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white shadow-md transition-colors cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download Document</span>
+                  <span>Download Archive</span>
                 </button>
               </div>
             </div>
@@ -408,19 +492,23 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
               <p className="text-sm font-medium text-slate-300">Loading learning document...</p>
               <p className="text-xs text-slate-500">Preparing preview for your device</p>
             </div>
-          ) : activeFileData || (directTargetUrl && directTargetUrl !== '#' && !directTargetUrl.startsWith('about:') && !directTargetUrl.includes('/api/files')) ? (
-            /* PDF & embedded documents */
+          ) : activeViewerSrc && activeViewerSrc !== '#' && !activeViewerSrc.startsWith('about:') && !activeViewerSrc.includes('/api/files') ? (
+            /* PDF & Office documents in interactive reader or stream */
             <iframe
-              src={activeFileData || directTargetUrl}
+              src={activeViewerSrc}
               title={resource.title}
-              className="w-full h-[540px] sm:h-[700px] border-0 bg-white rounded-lg shadow-sm"
+              className={`w-full border-0 bg-white rounded-lg shadow-sm ${
+                isFullscreen ? 'h-full flex-1' : 'h-[540px] sm:h-[720px]'
+              }`}
             />
           ) : resource.embed_url && !iframeError ? (
             /* YouTube or Remote Video/Doc */
             <iframe
               src={resource.embed_url}
               title={resource.title}
-              className="w-full h-[540px] sm:h-[700px] border-0 rounded-lg"
+              className={`w-full border-0 rounded-lg ${
+                isFullscreen ? 'h-full flex-1' : 'h-[540px] sm:h-[700px]'
+              }`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
               onError={() => setIframeError(true)}

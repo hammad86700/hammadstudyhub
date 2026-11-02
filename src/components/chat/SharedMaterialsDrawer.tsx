@@ -1,6 +1,6 @@
 // ==============================================================================
 // HAMMAD STUDYHUB — SHARED MATERIALS DRAWER / LOCKER
-// Quick access to all notes, PDFs, drive links, and resources shared between
+// Quick access to all notes, PDFs, learning materials, and resources shared between
 // CR, GR, Admin, and students in this active conversation.
 // ==============================================================================
 

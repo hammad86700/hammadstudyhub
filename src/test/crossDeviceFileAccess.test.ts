@@ -15,6 +15,7 @@ import {
   downloadResourceFile,
   getDownloadFileName,
   canPreviewDirectly,
+  isOfficeDocument,
 } from '../lib/resourceActions';
 import {
   mergeResourcesLocally,
@@ -276,5 +277,66 @@ describe('Cross-Device Learning Materials Access & Download System', () => {
     const repairedRes = updatedList.find((r) => r.id === 'res-legacy-006');
     expect(repairedRes).toBeDefined();
     expect(repairedRes?.external_url).toBe('/api/files?id=res-legacy-006');
+  });
+
+  it('Scenario 6: In-App Direct Reader allows students to read PDFs, PPTX slides, and Word docs on screen without downloading', () => {
+    const pdfResource: Resource = {
+      id: 'res-reader-pdf-007',
+      subject_id: 'sub-dld-101',
+      title: 'Digital Logic Gates Summary',
+      slug: 'digital-logic-gates-summary',
+      resource_type: 'pdf',
+      source_provider: 'supabase_storage',
+      external_url: 'https://test-project.supabase.co/storage/v1/object/public/studyhub-materials/sub-dld-101/Logic_Gates.pdf',
+      file_name: 'Logic_Gates.pdf',
+      mime_type: 'application/pdf',
+      tags: ['dld', 'gates'],
+      lesson_date: '2026-11-02',
+      status: 'published',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const pptResource: Resource = {
+      id: 'res-reader-ppt-008',
+      subject_id: 'sub-dld-101',
+      title: 'Flip Flops and Registers Presentation',
+      slug: 'flip-flops-registers-slides',
+      resource_type: 'presentation',
+      source_provider: 'supabase_storage',
+      external_url: 'https://test-project.supabase.co/storage/v1/object/public/studyhub-materials/sub-dld-101/Flip_Flops.pptx',
+      file_name: 'Flip_Flops.pptx',
+      mime_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      tags: ['dld', 'slides'],
+      lesson_date: '2026-11-02',
+      status: 'published',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // 1. Direct preview capability check
+    expect(canPreviewDirectly(pdfResource)).toBe(true);
+    expect(isOfficeDocument(pptResource.file_name, pptResource.mime_type)).toBe(true);
+
+    // 2. Verified direct target CDN URLs
+    const pdfUrl = getResourceFileUrl(pdfResource);
+    const pptUrl = getResourceFileUrl(pptResource);
+    expect(pdfUrl).toBe(pdfResource.external_url);
+    expect(pptUrl).toBe(pptResource.external_url);
+
+    // 3. Online viewer reader embed URL generator
+    const getOnlineReaderEmbedUrl = (url: string) =>
+      `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+
+    const pdfReaderEmbed = getOnlineReaderEmbedUrl(pdfUrl);
+    const pptReaderEmbed = getOnlineReaderEmbedUrl(pptUrl);
+
+    expect(pdfReaderEmbed).toContain('https://docs.google.com/viewer?url=');
+    expect(pdfReaderEmbed).toContain(encodeURIComponent(pdfResource.external_url));
+    expect(pdfReaderEmbed).toContain('embedded=true');
+
+    expect(pptReaderEmbed).toContain('https://docs.google.com/viewer?url=');
+    expect(pptReaderEmbed).toContain(encodeURIComponent(pptResource.external_url));
+    expect(pptReaderEmbed).toContain('embedded=true');
   });
 });

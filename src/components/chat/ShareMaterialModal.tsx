@@ -1,7 +1,7 @@
 // ==============================================================================
 // HAMMAD STUDYHUB — SHARE STUDY MATERIAL MODAL (CR & GR COLLABORATION)
 // Allows Class Representatives, Girls Representatives, and Admins to share
-// lecture notes, PDFs, drive links, assignments, and past papers directly in chat.
+// lecture notes, PDFs, web links, assignments, and past papers directly in chat.
 // ==============================================================================
 
 import React, { useState } from 'react';

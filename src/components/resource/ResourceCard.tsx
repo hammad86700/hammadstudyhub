@@ -109,18 +109,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
       navigate('/signup');
       return;
     }
-    if (
-      resource.external_url &&
-      resource.external_url.startsWith('http') &&
-      !resource.external_url.includes('/api/files')
-    ) {
-      window.open(resource.external_url, '_blank');
-      return;
-    }
-    if (resource.file_data && resource.file_data.startsWith('data:')) {
-      openResourceOnline(resource);
-      return;
-    }
+    // Navigate straight to the in-app document viewer so students read online directly without downloading
     navigate(`/resources/${resource.id}`);
   };
 

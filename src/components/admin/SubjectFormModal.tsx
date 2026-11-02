@@ -8,7 +8,6 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Subject } from '../../types';
 import { slugify } from '../../lib/utils';
-import { parseGoogleDriveUrl } from '../../lib/googleDrive';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Input, Textarea } from '../common/Input';
@@ -21,7 +20,6 @@ const subjectSchema = z.object({
   code: z.string().optional(),
   description: z.string().optional(),
   instructor: z.string().optional(),
-  google_drive_folder_url: z.string().optional(),
   icon: z.string().default('book-open'),
   color: z.string().default('blue'),
   is_featured: z.boolean().default(false),
@@ -50,22 +48,19 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isFolderLockedForCR = !isAdmin && Boolean(initialData?.google_drive_folder_url);
-
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<SubjectFormData>({
-    resolver: zodResolver(subjectSchema),
+    resolver: zodResolver(subjectSchema) as any,
     defaultValues: {
       name: '',
       slug: '',
       code: '',
       description: '',
       instructor: '',
-      google_drive_folder_url: '',
       icon: 'book-open',
       color: 'blue',
       is_featured: false,
@@ -83,7 +78,6 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         code: initialData.code || '',
         description: initialData.description || '',
         instructor: initialData.instructor || '',
-        google_drive_folder_url: initialData.google_drive_folder_url || '',
         icon: initialData.icon || 'book-open',
         color: initialData.color || 'blue',
         is_featured: initialData.is_featured,
@@ -97,7 +91,6 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         code: '',
         description: '',
         instructor: '',
-        google_drive_folder_url: '',
         icon: 'book-open',
         color: 'blue',
         is_featured: false,
@@ -114,20 +107,6 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
     try {
       const slug = data.slug?.trim() ? slugify(data.slug) : slugify(data.name);
 
-      let driveUrl = data.google_drive_folder_url?.trim() || '';
-      let folderId: string | undefined = undefined;
-
-      if (driveUrl) {
-        if (!driveUrl.startsWith('http://') && !driveUrl.startsWith('https://')) {
-          driveUrl = 'https://' + driveUrl;
-        }
-
-        const parsed = parseGoogleDriveUrl(driveUrl);
-        if (parsed.isValid && parsed.folderId) {
-          folderId = parsed.folderId;
-        }
-      }
-
       // Auto-generate course code if left empty
       let courseCode = data.code?.trim() || '';
       if (!courseCode) {
@@ -143,8 +122,6 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         ...data,
         code: courseCode,
         slug,
-        google_drive_folder_url: driveUrl || undefined,
-        google_drive_folder_id: folderId,
         folder_configured: true,
       });
       onClose();
