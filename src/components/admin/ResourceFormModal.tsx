@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { Resource, ResourceType, Subject, SourceProvider } from '../../types';
 import { parseYouTubeUrl, detectSourceProvider } from '../../lib/googleDrive';
-import { formatFileSize, fileToBase64 } from '../../lib/googleDriveApi';
+import { uploadLearningMaterialFile, formatFileSize, fileToBase64 } from '../../lib/cloudFileStorage';
 import { getTodayDateString, slugify } from '../../lib/utils';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -311,31 +311,35 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
             : `${data.title || 'Study Material'} - ${item.name.replace(/\.[^/.]+$/, '')}`;
 
         try {
-          // Convert file to Base64 payload
-          const base64Data = await fileToBase64(item.file);
-          setFileQueue((prev) =>
-            prev.map((i) => (i.id === item.id ? { ...i, progress: 75 } : i))
-          );
-
-          // Save directly into StudyHub system storage
           const uniqueId =
             typeof crypto !== 'undefined' && crypto.randomUUID
               ? crypto.randomUUID()
               : `res-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+          const targetSubjectId = currentSubject?.id || data.subject_id;
+
+          // Upload to Hammad StudyHub Cloud Storage (Supabase Storage /api/files + IndexedDB)
+          const uploadRes = await uploadLearningMaterialFile(item.file, uniqueId, targetSubjectId);
+
+          setFileQueue((prev) =>
+            prev.map((i) => (i.id === item.id ? { ...i, progress: 85 } : i))
+          );
+
           await onSubmit({
             ...data,
             id: uniqueId,
             title: resourceTitle,
-            subject_id: currentSubject?.id || data.subject_id,
+            subject_id: targetSubjectId,
             resource_type: item.inferredType || data.resource_type,
-            external_url: data.external_url || '',
+            external_url: uploadRes.fileUrl,
+            storage_path: uploadRes.storagePath,
             embed_url: '',
             file_name: item.name,
             original_filename: item.name,
             mime_type: item.file.type || 'application/pdf',
             file_size: item.size,
-            file_data: base64Data,
-            source_provider: 'supabase_storage',
+            file_data: uploadRes.fileData,
+            source_provider: uploadRes.sourceProvider,
             tags,
             slug: slugify(resourceTitle),
           });

@@ -42,6 +42,7 @@ import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
 import { AdminStudentsPage } from './pages/admin/AdminStudentsPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { initRealtimeSync } from './lib/realtimeSync';
+import { repairAndSyncExistingResources } from './lib/cloudFileStorage';
 
 // Configure TanStack Query with aggressive multi-device sync settings
 const queryClient = new QueryClient({
@@ -81,7 +82,16 @@ const RootRoute: React.FC = () => {
 export const App: React.FC = () => {
   React.useEffect(() => {
     const cleanup = initRealtimeSync(queryClient);
-    return cleanup;
+
+    // Automatically inspect and repair any previously uploaded files lacking live cloud links
+    const repairTimer = setTimeout(() => {
+      repairAndSyncExistingResources().catch(() => {});
+    }, 1200);
+
+    return () => {
+      cleanup();
+      clearTimeout(repairTimer);
+    };
   }, []);
 
   return (

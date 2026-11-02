@@ -286,10 +286,10 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
         {/* Embed Frame or Media Player */}
         <div className="relative bg-slate-900 min-h-[420px] sm:min-h-[560px] flex items-center justify-center p-2 sm:p-4">
           {/* Image files */}
-          {isImageFile && resource.file_data ? (
+          {isImageFile && (resource.file_data || (directTargetUrl && directTargetUrl !== '#')) ? (
             <div className="flex flex-col items-center justify-center max-w-full">
               <img
-                src={resource.file_data}
+                src={resource.file_data || directTargetUrl}
                 alt={resource.title}
                 className="max-w-full max-h-[640px] rounded-lg shadow-md object-contain bg-slate-950"
               />
@@ -338,12 +338,12 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
                 </button>
               </div>
             </div>
-          ) : resource.file_data ? (
+          ) : resource.file_data || (directTargetUrl && directTargetUrl !== '#' && !directTargetUrl.startsWith('about:')) ? (
             /* PDF & embedded documents */
             <iframe
-              src={resource.file_data}
+              src={resource.file_data || directTargetUrl}
               title={resource.title}
-              className="w-full h-[540px] sm:h-[700px] border-0 bg-white rounded-lg"
+              className="w-full h-[540px] sm:h-[700px] border-0 bg-white rounded-lg shadow-sm"
             />
           ) : resource.embed_url && !iframeError ? (
             /* YouTube or Remote Video/Doc */

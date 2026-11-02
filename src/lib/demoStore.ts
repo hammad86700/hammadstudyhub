@@ -357,8 +357,20 @@ export function mergeResourcesLocally(remoteList: Resource[]): Resource[] {
     }
 
     const existing = map.get(remoteRes.id);
+    const resolvedExternalUrl =
+      remoteRes.external_url && remoteRes.external_url !== '#' && remoteRes.external_url.trim() !== ''
+        ? remoteRes.external_url
+        : existing?.external_url && existing.external_url !== '#' && existing.external_url.trim() !== ''
+        ? existing.external_url
+        : remoteRes.file_name || remoteRes.id
+        ? `/api/files?id=${encodeURIComponent(remoteRes.id)}`
+        : remoteRes.external_url || '#';
+
     if (!existing) {
-      map.set(remoteRes.id, remoteRes);
+      map.set(remoteRes.id, {
+        ...remoteRes,
+        external_url: resolvedExternalUrl,
+      });
       if (remoteRes.file_data) {
         saveResourceFileData(remoteRes.id, remoteRes.file_data, {
           mime_type: remoteRes.mime_type,
@@ -370,10 +382,12 @@ export function mergeResourcesLocally(remoteList: Resource[]): Resource[] {
     } else {
       const existingTime = new Date(existing.updated_at || existing.created_at || 0).getTime();
       const remoteTime = new Date(remoteRes.updated_at || remoteRes.created_at || 0).getTime();
-      if (remoteTime > existingTime) {
+      if (remoteTime >= existingTime) {
         map.set(remoteRes.id, {
           ...existing,
           ...remoteRes,
+          external_url: resolvedExternalUrl,
+          storage_path: remoteRes.storage_path || existing.storage_path,
           file_data: remoteRes.file_data || existing.file_data,
         });
         if (remoteRes.file_data) {

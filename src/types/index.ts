@@ -165,6 +165,7 @@ export interface Resource {
   mime_type?: string;
   file_size?: string;
   file_data?: string;
+  storage_path?: string;
   topic?: string;
   chapter?: string;
   tags: string[];

@@ -12,16 +12,44 @@ import { getCachedFileData } from './fileStorage';
  * Normalizes or extracts the raw data/file URL for a resource
  */
 export function getResourceFileUrl(resource: Resource): string {
-  // Check memory / IndexedDB cache first
-  const cachedData = getCachedFileData(resource.id);
-  if (cachedData) return cachedData;
+  if (!resource) return '';
 
-  return (
-    resource.file_data ||
-    resource.google_drive_file_url ||
-    resource.external_url ||
-    ''
-  );
+  // 1. Check if external_url is already a valid HTTP link to cloud storage or API
+  if (
+    resource.external_url &&
+    resource.external_url.startsWith('http') &&
+    resource.external_url !== '#' &&
+    resource.external_url !== 'about:blank'
+  ) {
+    return resource.external_url;
+  }
+
+  // 2. Check if file_data is already a Base64 data URL
+  if (resource.file_data && resource.file_data.startsWith('data:')) {
+    return resource.file_data;
+  }
+
+  // 3. Check memory / IndexedDB local cache
+  const cachedData = getCachedFileData(resource.id);
+  if (cachedData && cachedData.startsWith('data:')) {
+    return cachedData;
+  }
+
+  // 4. If resource has an ID or file_name, fallback to the universal serverless streaming API
+  if (resource.id && (resource.file_name || resource.source_provider === 'supabase_storage')) {
+    return `/api/files?id=${encodeURIComponent(resource.id)}`;
+  }
+
+  // 5. Direct relative or absolute URL fallback
+  if (
+    resource.external_url &&
+    resource.external_url !== '#' &&
+    resource.external_url !== 'about:blank'
+  ) {
+    return resource.external_url;
+  }
+
+  return '';
 }
 
 /**
@@ -89,7 +117,7 @@ export function openResourceOnline(resource: Resource): void {
     return;
   }
 
-  // Handle Base64 Data URL
+  // Handle Base64 Data URL -> Blob URL for smooth native viewing in new tab
   if (fileUrl.startsWith('data:')) {
     try {
       if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
@@ -118,20 +146,20 @@ export function openResourceOnline(resource: Resource): void {
     }
   }
 
-  // If YouTube or Google Drive embed URL
-  if (resource.embed_url) {
+  // If YouTube embed URL
+  if (resource.source_provider === 'youtube' && resource.embed_url) {
     window.open(resource.embed_url, '_blank');
     return;
   }
 
-  // Direct web URL
+  // Direct web URL (Supabase Storage or /api/files)
   window.open(fileUrl, '_blank');
 }
 
 /**
  * OPTION 2: Download Resource Directly to user's device
  */
-export function downloadResourceFile(resource: Resource): void {
+export async function downloadResourceFile(resource: Resource): Promise<void> {
   const fileUrl = getResourceFileUrl(resource);
   if (!fileUrl) {
     alert('File download is currently unavailable. Please contact the administrator.');
@@ -179,23 +207,38 @@ export function downloadResourceFile(resource: Resource): void {
     }
   }
 
-  // 2. Google Drive Link: Use direct download endpoint if possible
-  if (fileUrl.includes('drive.google.com')) {
-    const fileIdMatch = fileUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || fileUrl.match(/id=([a-zA-Z0-9_-]+)/);
-    if (fileIdMatch && fileIdMatch[1]) {
-      const directDl = `https://drive.google.com/uc?export=download&id=${fileIdMatch[1]}`;
+  // 2. If it is an /api/files URL, append &download=true so the server streams Content-Disposition: attachment
+  if (fileUrl.includes('/api/files')) {
+    const dlUrl = fileUrl.includes('?') ? `${fileUrl}&download=true` : `${fileUrl}?download=true`;
+    const link = document.createElement('a');
+    link.href = dlUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return;
+  }
+
+  // 3. For Supabase Storage and external URLs, fetch as blob to force browser to save directly to disk
+  try {
+    const res = await fetch(fileUrl);
+    if (res.ok && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = directDl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
+      link.href = blobUrl;
+      link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 2500);
       return;
     }
+  } catch (fetchErr) {
+    console.warn('Direct blob download notice, falling back to direct anchor:', fetchErr);
   }
 
-  // 3. Regular external URL: trigger download link
+  // Fallback anchor click
   const link = document.createElement('a');
   link.href = fileUrl;
   link.download = fileName;

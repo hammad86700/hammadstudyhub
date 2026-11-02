@@ -108,8 +108,25 @@ export function useResources(
         };
         mergedMap.set(r.id, enriched);
       });
-      // 2. Add Supabase resources (matching id or new)
-      resources.forEach((r) => mergedMap.set(r.id, r));
+      // 2. Add Supabase resources (preserving local file_data & ensuring valid cloud URLs)
+      resources.forEach((r) => {
+        const local = mergedMap.get(r.id);
+        const resolvedUrl =
+          r.external_url && r.external_url !== '#' && r.external_url !== 'about:blank'
+            ? r.external_url
+            : local?.external_url && local.external_url !== '#'
+            ? local.external_url
+            : r.file_name || r.id
+            ? `/api/files?id=${encodeURIComponent(r.id)}`
+            : r.external_url;
+
+        mergedMap.set(r.id, {
+          ...local,
+          ...r,
+          file_data: local?.file_data || r.file_data,
+          external_url: resolvedUrl,
+        });
+      });
 
       let allResources = Array.from(mergedMap.values());
 
@@ -277,11 +294,19 @@ export function useResourceMutations() {
 
       const tempId = validUUID || (inputId && !inputId.startsWith('res-') ? inputId : `res-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
 
+      const targetFileUrl =
+        input.external_url && input.external_url.trim() !== '#' && input.external_url.trim() !== ''
+          ? input.external_url.trim()
+          : input.file_name || (input as any).file_data
+          ? `/api/files?id=${encodeURIComponent(tempId)}`
+          : '#';
+
       const newRes: Resource = {
         ...input,
         id: tempId,
         slug,
         source_provider: provider,
+        external_url: targetFileUrl,
         embed_url: embedUrl,
         published_at: publishedAt,
         created_at: now,
@@ -318,7 +343,7 @@ export function useResourceMutations() {
             resource_type: input.resource_type || 'pdf',
             lesson_date: input.lesson_date || now.substring(0, 10),
             source_provider: provider,
-            external_url: input.external_url?.trim() || '#',
+            external_url: targetFileUrl,
             embed_url: embedUrl || null,
             description: input.description?.trim() || null,
             topic: input.topic?.trim() || null,
@@ -332,6 +357,7 @@ export function useResourceMutations() {
             supabasePayload.id = validUUID;
           }
 
+          if ((input as any).storage_path) supabasePayload.storage_path = (input as any).storage_path;
           if (input.file_name) supabasePayload.file_name = input.file_name;
           if (input.file_size) supabasePayload.file_size = input.file_size;
           if (input.mime_type) supabasePayload.mime_type = input.mime_type;
