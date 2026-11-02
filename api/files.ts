@@ -76,7 +76,114 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
     // 1. Check in-memory store
     let fileRecord = store[id];
 
-    // 2. If not found in memory, check Supabase database if configured
+    // 2. Check global sync store in memory if available
+    if (!fileRecord) {
+      const syncStoreResources = (globalThis as any).__studyhub_cloud_sync_store__?.resources;
+      if (Array.isArray(syncStoreResources)) {
+        const matched = syncStoreResources.find((r: any) => r && r.id === id);
+        if (matched) {
+          if (matched.file_data && typeof matched.file_data === 'string' && matched.file_data.startsWith('data:')) {
+            fileRecord = {
+              id: matched.id,
+              file_name: matched.file_name || 'study-material.pdf',
+              mime_type: matched.mime_type || 'application/pdf',
+              file_size: matched.file_size,
+              file_data: matched.file_data,
+              updated_at: matched.updated_at || new Date().toISOString(),
+            };
+            store[id] = fileRecord;
+          } else if (
+            matched.external_url &&
+            matched.external_url.startsWith('http') &&
+            !matched.external_url.includes('/api/files')
+          ) {
+            res.setHeader('Location', matched.external_url);
+            return res.status(302).end();
+          }
+        }
+      }
+    }
+
+    // 3. Fallback to /api/sync endpoint on the same deployment
+    if (!fileRecord) {
+      try {
+        const host = req.headers?.host || 'hammadstudyhub.vercel.app';
+        const proto = (req.headers?.['x-forwarded-proto'] as string) || (host.includes('localhost') ? 'http' : 'https');
+        const syncRes = await fetch(`${proto}://${host}/api/sync`);
+        if (syncRes.ok) {
+          const syncData = await syncRes.json();
+          const matched = syncData?.snapshot?.resources?.find((r: any) => r && r.id === id);
+          if (matched) {
+            if (matched.file_data && typeof matched.file_data === 'string' && matched.file_data.startsWith('data:')) {
+              fileRecord = {
+                id: matched.id,
+                file_name: matched.file_name || 'study-material.pdf',
+                mime_type: matched.mime_type || 'application/pdf',
+                file_size: matched.file_size,
+                file_data: matched.file_data,
+                updated_at: matched.updated_at || new Date().toISOString(),
+              };
+              store[id] = fileRecord;
+            } else if (
+              matched.external_url &&
+              matched.external_url.startsWith('http') &&
+              !matched.external_url.includes('/api/files')
+            ) {
+              res.setHeader('Location', matched.external_url);
+              return res.status(302).end();
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Sync fallback notice in /api/files:', syncErr);
+      }
+    }
+
+    // 4. Fallback to ntfy.sh cache history
+    if (!fileRecord) {
+      try {
+        const ntfyRes = await fetch('https://ntfy.sh/hammadstudyhub_global_sync_v2/json?poll=1');
+        if (ntfyRes.ok) {
+          const text = await ntfyRes.text();
+          const lines = text.trim().split('\n').filter(Boolean);
+          for (const line of lines) {
+            try {
+              const parsed = JSON.parse(line);
+              const msg = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : parsed.message;
+              const resources = msg?.payload?.resources || (msg?.data ? [msg.data] : []);
+              const matched = resources.find((r: any) => r && r.id === id);
+              if (matched) {
+                if (matched.file_data && typeof matched.file_data === 'string' && matched.file_data.startsWith('data:')) {
+                  fileRecord = {
+                    id: matched.id,
+                    file_name: matched.file_name || 'study-material.pdf',
+                    mime_type: matched.mime_type || 'application/pdf',
+                    file_size: matched.file_size,
+                    file_data: matched.file_data,
+                    updated_at: matched.updated_at || new Date().toISOString(),
+                  };
+                  store[id] = fileRecord;
+                  break;
+                } else if (
+                  matched.external_url &&
+                  matched.external_url.startsWith('http') &&
+                  !matched.external_url.includes('/api/files')
+                ) {
+                  res.setHeader('Location', matched.external_url);
+                  return res.status(302).end();
+                }
+              }
+            } catch {
+              // ignore single bad line
+            }
+          }
+        }
+      } catch (ntfyErr) {
+        console.warn('ntfy history fallback notice in /api/files:', ntfyErr);
+      }
+    }
+
+    // 5. If not found in memory, check Supabase database if configured
     if (!fileRecord) {
       const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
       const supabaseKey =
@@ -126,6 +233,13 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
     }
 
     if (!fileRecord || !fileRecord.file_data) {
+      const acceptHeader = (req.headers?.['accept'] as string) || '';
+      if (acceptHeader.includes('text/html') || !acceptHeader.includes('application/json')) {
+        // Seamlessly redirect browser navigation directly to the student portal resource viewer
+        res.setHeader('Location', `/resources/${encodeURIComponent(id)}`);
+        return res.status(302).end();
+      }
+
       return res.status(404).json({
         error: 'FILE_NOT_FOUND',
         message: 'The requested learning material is currently being processed or is unavailable.',
@@ -241,3 +355,4 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
   return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
 }
+

@@ -30,6 +30,7 @@ import { Resource } from '../../types';
 import { formatLessonDate, formatRelativeTime, getResourceTypeMeta } from '../../lib/utils';
 import { parseGoogleDriveUrl } from '../../lib/googleDrive';
 import { isBookmarked, addBookmark, removeBookmark, isChecklistCompleted, toggleChecklistItem } from '../../lib/storage';
+import { getResourceFileData, saveResourceFileData } from '../../lib/fileStorage';
 import {
   openResourceOnline,
   downloadResourceFile,
@@ -57,6 +58,70 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [iframeError, setIframeError] = useState(false);
+  const [activeFileData, setActiveFileData] = useState<string | null>(resource.file_data || null);
+  const [isLoadingFile, setIsLoadingFile] = useState<boolean>(
+    !resource.file_data && Boolean(resource.file_name || resource.id)
+  );
+
+  React.useEffect(() => {
+    let isMounted = true;
+    if (resource.file_data) {
+      setActiveFileData(resource.file_data);
+      setIsLoadingFile(false);
+      return;
+    }
+
+    // Attempt to load from IndexedDB
+    getResourceFileData(resource.id).then((cached) => {
+      if (!isMounted) return;
+      if (cached) {
+        setActiveFileData(cached);
+        setIsLoadingFile(false);
+        return;
+      }
+
+      // If not in IndexedDB, fetch binary stream from /api/files
+      if (resource.id) {
+        fetch(`/api/files?id=${encodeURIComponent(resource.id)}`)
+          .then((res) => {
+            if (!isMounted) return;
+            if (res.ok) {
+              const contentType = res.headers.get('content-type') || '';
+              if (contentType.includes('application/json')) {
+                setIsLoadingFile(false);
+                return;
+              }
+              return res.blob().then((blob) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  if (isMounted && typeof reader.result === 'string') {
+                    setActiveFileData(reader.result);
+                    saveResourceFileData(resource.id, reader.result, {
+                      file_name: resource.file_name,
+                      mime_type: resource.mime_type,
+                      file_size: resource.file_size,
+                    }).catch(() => {});
+                  }
+                  if (isMounted) setIsLoadingFile(false);
+                };
+                reader.readAsDataURL(blob);
+              });
+            } else {
+              setIsLoadingFile(false);
+            }
+          })
+          .catch(() => {
+            if (isMounted) setIsLoadingFile(false);
+          });
+      } else {
+        setIsLoadingFile(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [resource.id, resource.file_data]);
 
   const meta = getResourceTypeMeta(resource.resource_type);
   const driveInfo =
@@ -286,10 +351,10 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
         {/* Embed Frame or Media Player */}
         <div className="relative bg-slate-900 min-h-[420px] sm:min-h-[560px] flex items-center justify-center p-2 sm:p-4">
           {/* Image files */}
-          {isImageFile && (resource.file_data || (directTargetUrl && directTargetUrl !== '#')) ? (
+          {isImageFile && (activeFileData || (directTargetUrl && !directTargetUrl.includes('/api/files') && directTargetUrl !== '#')) ? (
             <div className="flex flex-col items-center justify-center max-w-full">
               <img
-                src={resource.file_data || directTargetUrl}
+                src={activeFileData || directTargetUrl}
                 alt={resource.title}
                 className="max-w-full max-h-[640px] rounded-lg shadow-md object-contain bg-slate-950"
               />
@@ -338,10 +403,17 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
                 </button>
               </div>
             </div>
-          ) : resource.file_data || (directTargetUrl && directTargetUrl !== '#' && !directTargetUrl.startsWith('about:')) ? (
+          ) : isLoadingFile ? (
+            /* Document Loading Indicator */
+            <div className="p-12 text-center text-white space-y-4">
+              <div className="w-10 h-10 mx-auto rounded-full border-3 border-brand-500 border-t-transparent animate-spin" />
+              <p className="text-sm font-medium text-slate-300">Loading learning document...</p>
+              <p className="text-xs text-slate-500">Preparing preview for your device</p>
+            </div>
+          ) : activeFileData || (directTargetUrl && directTargetUrl !== '#' && !directTargetUrl.startsWith('about:') && !directTargetUrl.includes('/api/files')) ? (
             /* PDF & embedded documents */
             <iframe
-              src={resource.file_data || directTargetUrl}
+              src={activeFileData || directTargetUrl}
               title={resource.title}
               className="w-full h-[540px] sm:h-[700px] border-0 bg-white rounded-lg shadow-sm"
             />

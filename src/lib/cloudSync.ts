@@ -31,7 +31,7 @@ import {
   deleteStudent,
   deleteDemoAnnouncement,
 } from './demoStore';
-import { deleteResourceFileData } from './fileStorage';
+import { deleteResourceFileData, getResourceFileData, getCachedFileData } from './fileStorage';
 import { DEVICE_ID } from './realtimeSync';
 
 const NTFY_TOPIC = 'hammadstudyhub_global_sync_v2';
@@ -145,15 +145,26 @@ export async function syncWithCloud(queryClient?: QueryClient | null): Promise<v
 
   try {
     const localSubjects = getDemoSubjects();
-    // Exclude gigantic base64 file payloads from routine sync to stay under HTTP payload thresholds
-    const localResources = getDemoResources().map((r) => {
-      // If file_data is larger than 1.5MB, strip it from lightweight sync payload
-      if (r.file_data && r.file_data.length > 1.5 * 1024 * 1024) {
-        const { file_data, ...rest } = r;
-        return rest;
-      }
-      return r;
-    });
+    const rawLocalResources = getDemoResources();
+    const localResources = await Promise.all(
+      rawLocalResources.map(async (r) => {
+        let fileData: string | undefined = r.file_data || (getCachedFileData(r.id) ?? undefined);
+        if (!fileData) {
+          try {
+            const raw = await getResourceFileData(r.id);
+            if (raw) fileData = raw;
+          } catch {
+            // ignore
+          }
+        }
+        // Keep files up to 3.5MB to stay well under Vercel serverless request limits
+        if (fileData && fileData.length > 3.5 * 1024 * 1024) {
+          const { file_data: _, ...rest } = r;
+          return rest;
+        }
+        return { ...r, file_data: fileData };
+      })
+    );
     const localStudents = getRegisteredStudents();
     const localAnnouncements = getDemoAnnouncements();
     const localChats = getAllChatMessages().slice(-30);

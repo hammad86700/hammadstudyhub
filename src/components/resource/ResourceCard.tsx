@@ -109,7 +109,19 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
       navigate('/signup');
       return;
     }
-    openResourceOnline(resource);
+    if (
+      resource.external_url &&
+      resource.external_url.startsWith('http') &&
+      !resource.external_url.includes('/api/files')
+    ) {
+      window.open(resource.external_url, '_blank');
+      return;
+    }
+    if (resource.file_data && resource.file_data.startsWith('data:')) {
+      openResourceOnline(resource);
+      return;
+    }
+    navigate(`/resources/${resource.slug || resource.id}`);
   };
 
   const handleDownloadClick = (e: React.MouseEvent) => {
@@ -194,30 +206,18 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
         {/* Resource Title & Direct Open Link */}
         <div>
           <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
-            {directUrl ? (
-              <a
-                href={isLoggedIn ? directUrl : '/signup'}
-                target={isLoggedIn ? '_blank' : '_self'}
-                rel="noopener noreferrer"
-                onClick={handleOpenOnlineClick}
-                className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none inline-flex items-center gap-1.5 group cursor-pointer"
-                title={isLoggedIn ? 'Read or open study material directly without downloading' : 'Sign up to access this study material'}
-              >
-                <span>{resource.title}</span>
-                {isLoggedIn ? (
-                  <Eye className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
-                ) : (
-                  <Lock className="w-3.5 h-3.5 text-brand-500 shrink-0" />
-                )}
-              </a>
-            ) : (
-              <Link
-                to={`/resources/${resource.slug || resource.id}`}
-                className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none"
-              >
-                {resource.title}
-              </Link>
-            )}
+            <Link
+              to={isLoggedIn ? `/resources/${resource.slug || resource.id}` : '/signup'}
+              className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none inline-flex items-center gap-1.5 group cursor-pointer"
+              title={isLoggedIn ? 'Open in study viewer' : 'Sign up to access this study material'}
+            >
+              <span>{resource.title}</span>
+              {isLoggedIn ? (
+                <Eye className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
+              ) : (
+                <Lock className="w-3.5 h-3.5 text-brand-500 shrink-0" />
+              )}
+            </Link>
           </h4>
 
           {/* Attached File Badge (if uploaded from system) */}

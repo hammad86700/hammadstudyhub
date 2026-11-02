@@ -110,10 +110,30 @@ function mergeRecords<T extends { id: string; updated_at?: string; created_at?: 
       const existingTime = new Date(found.updated_at || found.created_at || 0).getTime();
       const incomingTime = new Date(item.updated_at || item.created_at || 0).getTime();
 
+      const preservedFileData = (item as any).file_data || (found as any).file_data;
+      const validExternalUrl =
+        (item as any).external_url && (item as any).external_url !== '#' && (item as any).external_url !== 'about:blank'
+          ? (item as any).external_url
+          : (found as any).external_url && (found as any).external_url !== '#' && (found as any).external_url !== 'about:blank'
+          ? (found as any).external_url
+          : (item as any).external_url || (found as any).external_url || '#';
+
       if (incomingTime >= existingTime) {
-        map.set(targetId, { ...found, ...item, id: targetId });
+        map.set(targetId, {
+          ...found,
+          ...item,
+          id: targetId,
+          file_data: preservedFileData,
+          external_url: validExternalUrl,
+        });
       } else {
-        map.set(targetId, { ...item, ...found, id: targetId });
+        map.set(targetId, {
+          ...item,
+          ...found,
+          id: targetId,
+          file_data: preservedFileData,
+          external_url: validExternalUrl,
+        });
       }
     }
   }
@@ -285,6 +305,24 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
           const before = store.resources.length;
           store.resources = mergeRecords(store.resources, validResources, (r) => `${r.title}__${r.subject_id}`);
           if (store.resources.length !== before) hasNewData = true;
+
+          // Mirror file binary payloads to __studyhub_file_store__ so /api/files can stream them
+          if (!(globalThis as any).__studyhub_file_store__) {
+            (globalThis as any).__studyhub_file_store__ = {};
+          }
+          for (const r of store.resources) {
+            if (r.file_data && typeof r.file_data === 'string' && r.file_data.startsWith('data:')) {
+              (globalThis as any).__studyhub_file_store__[r.id] = {
+                id: r.id,
+                file_name: r.file_name || `${r.title}.pdf`,
+                mime_type: r.mime_type || 'application/pdf',
+                file_size: r.file_size,
+                file_data: r.file_data,
+                subject_id: r.subject_id,
+                updated_at: r.updated_at || new Date().toISOString(),
+              };
+            }
+          }
         }
 
         // Merge incoming students (excluding tombstoned students)

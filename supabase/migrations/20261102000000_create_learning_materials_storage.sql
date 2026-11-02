@@ -68,3 +68,4 @@ drop policy if exists "Anyone can view published resources" on public.resources;
 create policy "Anyone can view published resources"
   on public.resources for select
   using (status = 'published' or true);
+

@@ -152,8 +152,16 @@ export function openResourceOnline(resource: Resource): void {
     return;
   }
 
-  // Direct web URL (Supabase Storage or /api/files)
-  window.open(fileUrl, '_blank');
+  // Direct external cloud URL (Supabase Storage CDN, etc.)
+  if (fileUrl.startsWith('http') && !fileUrl.includes('/api/files')) {
+    window.open(fileUrl, '_blank');
+    return;
+  }
+
+  // Internal endpoint (/api/files) or app route: navigate within the platform viewer
+  if (typeof window !== 'undefined') {
+    window.location.href = `/resources/${encodeURIComponent(resource.slug || resource.id)}`;
+  }
 }
 
 /**
