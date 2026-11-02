@@ -39,6 +39,16 @@ declare global {
   var __studyhub_file_store__: Record<string, StoredCloudFile> | undefined;
 }
 
+/**
+ * Validates that file_data is true binary material and not an accidental HTML fallback
+ */
+function isCorruptedHtmlData(dataUrl?: string): boolean {
+  if (!dataUrl || typeof dataUrl !== 'string') return true;
+  if (dataUrl.startsWith('data:text/html')) return true;
+  if (dataUrl.includes('PCFET0NUWVBFIGh0bWw') || dataUrl.includes('PGh0bWw')) return true;
+  return false;
+}
+
 function getFileStore(): Record<string, StoredCloudFile> {
   if (!globalThis.__studyhub_file_store__) {
     globalThis.__studyhub_file_store__ = {};
@@ -75,6 +85,10 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
     // 1. Check in-memory store
     let fileRecord = store[id];
+    if (fileRecord && isCorruptedHtmlData(fileRecord.file_data)) {
+      delete store[id];
+      fileRecord = undefined;
+    }
 
     // 2. Check global sync store in memory if available
     if (!fileRecord) {
@@ -82,7 +96,12 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       if (Array.isArray(syncStoreResources)) {
         const matched = syncStoreResources.find((r: any) => r && r.id === id);
         if (matched) {
-          if (matched.file_data && typeof matched.file_data === 'string' && matched.file_data.startsWith('data:')) {
+          if (
+            matched.file_data &&
+            typeof matched.file_data === 'string' &&
+            matched.file_data.startsWith('data:') &&
+            !isCorruptedHtmlData(matched.file_data)
+          ) {
             fileRecord = {
               id: matched.id,
               file_name: matched.file_name || 'study-material.pdf',
@@ -114,7 +133,12 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
           const syncData = await syncRes.json();
           const matched = syncData?.snapshot?.resources?.find((r: any) => r && r.id === id);
           if (matched) {
-            if (matched.file_data && typeof matched.file_data === 'string' && matched.file_data.startsWith('data:')) {
+            if (
+              matched.file_data &&
+              typeof matched.file_data === 'string' &&
+              matched.file_data.startsWith('data:') &&
+              !isCorruptedHtmlData(matched.file_data)
+            ) {
               fileRecord = {
                 id: matched.id,
                 file_name: matched.file_name || 'study-material.pdf',
@@ -153,7 +177,12 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
               const resources = msg?.payload?.resources || (msg?.data ? [msg.data] : []);
               const matched = resources.find((r: any) => r && r.id === id);
               if (matched) {
-                if (matched.file_data && typeof matched.file_data === 'string' && matched.file_data.startsWith('data:')) {
+                if (
+                  matched.file_data &&
+                  typeof matched.file_data === 'string' &&
+                  matched.file_data.startsWith('data:') &&
+                  !isCorruptedHtmlData(matched.file_data)
+                ) {
                   fileRecord = {
                     id: matched.id,
                     file_name: matched.file_name || 'study-material.pdf',
@@ -209,7 +238,7 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
             const rows = await sRes.json();
             if (Array.isArray(rows) && rows.length > 0) {
               const row = rows[0];
-              if (row.file_data && row.file_data.startsWith('data:')) {
+              if (row.file_data && row.file_data.startsWith('data:') && !isCorruptedHtmlData(row.file_data)) {
                 fileRecord = {
                   id: row.id,
                   file_name: row.file_name || 'study-material.pdf',
@@ -232,7 +261,7 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       }
     }
 
-    if (!fileRecord || !fileRecord.file_data) {
+    if (!fileRecord || !fileRecord.file_data || isCorruptedHtmlData(fileRecord.file_data)) {
       const acceptHeader = (req.headers?.['accept'] as string) || '';
       if (!download && (acceptHeader.includes('text/html') || !acceptHeader.includes('application/json'))) {
         // Seamlessly redirect browser navigation directly to the student portal resource viewer
@@ -242,7 +271,7 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
       return res.status(404).json({
         error: 'FILE_NOT_FOUND',
-        message: 'The requested learning material is currently being processed or is unavailable.',
+        message: 'The requested learning material is currently being synced or is stored in cloud storage.',
       });
     }
 
@@ -292,6 +321,13 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
       return res.status(400).json({
         error: 'INVALID_PAYLOAD',
         message: 'id and file_data are required.',
+      });
+    }
+
+    if (isCorruptedHtmlData(file_data)) {
+      return res.status(400).json({
+        error: 'INVALID_FILE_DATA',
+        message: 'File data appears to be HTML content rather than a valid binary academic document.',
       });
     }
 

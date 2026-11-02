@@ -11,6 +11,16 @@ const STORE_NAME = 'files';
 // Synchronous memory cache for zero-latency retrieval
 const memoryCache = new Map<string, string>();
 
+/**
+ * Validates that file data is clean binary academic material, not an accidental SPA HTML fallback
+ */
+export function isCorruptedHtmlData(dataUrl?: string): boolean {
+  if (!dataUrl || typeof dataUrl !== 'string') return true;
+  if (dataUrl.startsWith('data:text/html')) return true;
+  if (dataUrl.includes('PCFET0NUWVBFIGh0bWw') || dataUrl.includes('PGh0bWw')) return true;
+  return false;
+}
+
 interface StoredFileRecord {
   id: string; // resource ID
   data: string; // Base64 data URL
@@ -62,7 +72,7 @@ export async function saveResourceFileData(
   dataUrl: string,
   meta?: { mime_type?: string; file_name?: string; file_size?: string }
 ): Promise<void> {
-  if (!resourceId || !dataUrl) return;
+  if (!resourceId || !dataUrl || isCorruptedHtmlData(dataUrl)) return;
 
   // 1. Immediately store in fast synchronous memory cache
   memoryCache.set(resourceId, dataUrl);
@@ -105,7 +115,12 @@ export async function saveResourceFileData(
  * Retrieves file data synchronously from memory cache or falls back to empty
  */
 export function getCachedFileData(resourceId: string): string | null {
-  return memoryCache.get(resourceId) || null;
+  const cached = memoryCache.get(resourceId);
+  if (cached && isCorruptedHtmlData(cached)) {
+    memoryCache.delete(resourceId);
+    return null;
+  }
+  return cached || null;
 }
 
 /**
@@ -115,7 +130,12 @@ export async function getResourceFileData(resourceId: string): Promise<string | 
   if (!resourceId) return null;
 
   if (memoryCache.has(resourceId)) {
-    return memoryCache.get(resourceId)!;
+    const cached = memoryCache.get(resourceId)!;
+    if (isCorruptedHtmlData(cached)) {
+      memoryCache.delete(resourceId);
+    } else {
+      return cached;
+    }
   }
 
   try {
@@ -131,8 +151,13 @@ export async function getResourceFileData(resourceId: string): Promise<string | 
         req.onsuccess = () => {
           const result = req.result as StoredFileRecord | undefined;
           if (result && result.data) {
-            memoryCache.set(resourceId, result.data);
-            resolve(result.data);
+            if (isCorruptedHtmlData(result.data)) {
+              deleteResourceFileData(resourceId).catch(() => {});
+              resolve(null);
+            } else {
+              memoryCache.set(resourceId, result.data);
+              resolve(result.data);
+            }
           } else {
             resolve(null);
           }

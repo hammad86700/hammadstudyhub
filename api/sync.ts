@@ -47,6 +47,17 @@ declare global {
   var __studyhub_cloud_sync_store__: SyncStoreState | undefined;
 }
 
+/**
+ * Validates that file data is clean binary academic material, not an accidental SPA HTML fallback
+ */
+function isCleanBinaryData(data: unknown): boolean {
+  if (!data || typeof data !== 'string') return false;
+  if (!data.startsWith('data:')) return false;
+  if (data.startsWith('data:text/html')) return false;
+  if (data.includes('PCFET0NUWVBFIGh0bWw') || data.includes('PGh0bWw')) return false;
+  return true;
+}
+
 function getInitialStore(): SyncStoreState {
   if (!globalThis.__studyhub_cloud_sync_store__) {
     globalThis.__studyhub_cloud_sync_store__ = {
@@ -110,7 +121,14 @@ function mergeRecords<T extends { id: string; updated_at?: string; created_at?: 
       const existingTime = new Date(found.updated_at || found.created_at || 0).getTime();
       const incomingTime = new Date(item.updated_at || item.created_at || 0).getTime();
 
-      const preservedFileData = (item as any).file_data || (found as any).file_data;
+      const incomingData = (item as any).file_data;
+      const existingData = (found as any).file_data;
+      const preservedFileData = isCleanBinaryData(incomingData)
+        ? incomingData
+        : isCleanBinaryData(existingData)
+        ? existingData
+        : undefined;
+
       const validExternalUrl =
         (item as any).external_url && (item as any).external_url !== '#' && (item as any).external_url !== 'about:blank'
           ? (item as any).external_url
@@ -258,7 +276,15 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
     if (req.method === 'GET') {
       // Purge any tombstoned records before responding
       store.subjects = store.subjects.filter((s) => !store.deleted_ids[s.id]);
-      store.resources = store.resources.filter((r) => !store.deleted_ids[r.id] && !store.deleted_ids[r.subject_id]);
+      store.resources = store.resources
+        .filter((r) => !store.deleted_ids[r.id] && !store.deleted_ids[r.subject_id])
+        .map((r) => {
+          if (r.file_data && !isCleanBinaryData(r.file_data)) {
+            const { file_data: _, ...clean } = r;
+            return clean;
+          }
+          return r;
+        });
       store.students = store.students.filter((st) => !store.deleted_ids[st.id]);
       store.announcements = store.announcements.filter((a) => !store.deleted_ids[a.id]);
 
@@ -311,7 +337,7 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
             (globalThis as any).__studyhub_file_store__ = {};
           }
           for (const r of store.resources) {
-            if (r.file_data && typeof r.file_data === 'string' && r.file_data.startsWith('data:')) {
+            if (isCleanBinaryData(r.file_data)) {
               (globalThis as any).__studyhub_file_store__[r.id] = {
                 id: r.id,
                 file_name: r.file_name || `${r.title}.pdf`,
@@ -321,6 +347,12 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
                 subject_id: r.subject_id,
                 updated_at: r.updated_at || new Date().toISOString(),
               };
+            } else if (r.file_data) {
+              // Purge corrupted html fallback data
+              delete r.file_data;
+              if ((globalThis as any).__studyhub_file_store__?.[r.id]) {
+                delete (globalThis as any).__studyhub_file_store__[r.id];
+              }
             }
           }
         }

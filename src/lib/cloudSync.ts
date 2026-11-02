@@ -31,7 +31,7 @@ import {
   deleteStudent,
   deleteDemoAnnouncement,
 } from './demoStore';
-import { deleteResourceFileData, getResourceFileData, getCachedFileData } from './fileStorage';
+import { deleteResourceFileData, getResourceFileData, getCachedFileData, isCorruptedHtmlData } from './fileStorage';
 import { DEVICE_ID } from './realtimeSync';
 
 const NTFY_TOPIC = 'hammadstudyhub_global_sync_v2';
@@ -111,7 +111,14 @@ export function ingestCloudSnapshot(
   }
 
   if (Array.isArray(snapshot.resources) && snapshot.resources.length > 0) {
-    mergeResourcesLocally(snapshot.resources);
+    const sanitizedResources = snapshot.resources.map((r: any) => {
+      if (r && r.file_data && isCorruptedHtmlData(r.file_data)) {
+        const { file_data: _, ...rest } = r;
+        return rest;
+      }
+      return r;
+    });
+    mergeResourcesLocally(sanitizedResources);
   }
 
   if (Array.isArray(snapshot.students) && snapshot.students.length > 0) {
@@ -156,6 +163,9 @@ export async function syncWithCloud(queryClient?: QueryClient | null): Promise<v
           } catch {
             // ignore
           }
+        }
+        if (fileData && isCorruptedHtmlData(fileData)) {
+          fileData = undefined;
         }
         // Keep files up to 3.5MB to stay well under Vercel serverless request limits
         if (fileData && fileData.length > 3.5 * 1024 * 1024) {

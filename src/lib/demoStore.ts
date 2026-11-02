@@ -25,6 +25,7 @@ import {
   saveResourceFileData,
   getCachedFileData,
   deleteResourceFileData,
+  isCorruptedHtmlData,
 } from './fileStorage';
 
 const SUBJECTS_KEY = 'studyhub_subjects_clean';
@@ -245,11 +246,15 @@ export function getDemoResources(): Resource[] {
     return memoryResourcesCache
       .filter((r) => !isTombstoned(r.id) && !isTombstoned(r.subject_id))
       .map((r) => {
-        if (!r.file_data) {
-          const cached = getCachedFileData(r.id);
-          if (cached) return { ...r, file_data: cached };
+        let fd = r.file_data;
+        if (fd && isCorruptedHtmlData(fd)) {
+          fd = undefined;
         }
-        return r;
+        if (!fd) {
+          const cached = getCachedFileData(r.id);
+          if (cached && !isCorruptedHtmlData(cached)) fd = cached;
+        }
+        return { ...r, file_data: fd };
       });
   }
 
@@ -264,11 +269,15 @@ export function getDemoResources(): Resource[] {
   
   // Hydrate file_data from IndexedDB / memory cache
   const hydrated = cleaned.map((r) => {
-    const cached = getCachedFileData(r.id);
-    if (cached && !r.file_data) {
-      return { ...r, file_data: cached };
+    let fd = r.file_data;
+    if (fd && isCorruptedHtmlData(fd)) {
+      fd = undefined;
     }
-    return r;
+    const cached = getCachedFileData(r.id);
+    if (cached && !fd && !isCorruptedHtmlData(cached)) {
+      fd = cached;
+    }
+    return { ...r, file_data: fd };
   });
 
   memoryResourcesCache = hydrated;
@@ -366,13 +375,18 @@ export function mergeResourcesLocally(remoteList: Resource[]): Resource[] {
         ? `/api/files?id=${encodeURIComponent(remoteRes.id)}`
         : remoteRes.external_url || '#';
 
+    const cleanRemoteData = remoteRes.file_data && !isCorruptedHtmlData(remoteRes.file_data) ? remoteRes.file_data : undefined;
+    const cleanExistingData = existing?.file_data && !isCorruptedHtmlData(existing.file_data) ? existing.file_data : undefined;
+    const resolvedFileData = cleanRemoteData || cleanExistingData;
+
     if (!existing) {
       map.set(remoteRes.id, {
         ...remoteRes,
+        file_data: resolvedFileData,
         external_url: resolvedExternalUrl,
       });
-      if (remoteRes.file_data) {
-        saveResourceFileData(remoteRes.id, remoteRes.file_data, {
+      if (resolvedFileData) {
+        saveResourceFileData(remoteRes.id, resolvedFileData, {
           mime_type: remoteRes.mime_type,
           file_name: remoteRes.file_name,
           file_size: remoteRes.file_size,
@@ -388,10 +402,10 @@ export function mergeResourcesLocally(remoteList: Resource[]): Resource[] {
           ...remoteRes,
           external_url: resolvedExternalUrl,
           storage_path: remoteRes.storage_path || existing.storage_path,
-          file_data: remoteRes.file_data || existing.file_data,
+          file_data: resolvedFileData,
         });
-        if (remoteRes.file_data) {
-          saveResourceFileData(remoteRes.id, remoteRes.file_data, {
+        if (resolvedFileData) {
+          saveResourceFileData(remoteRes.id, resolvedFileData, {
             mime_type: remoteRes.mime_type,
             file_name: remoteRes.file_name,
             file_size: remoteRes.file_size,

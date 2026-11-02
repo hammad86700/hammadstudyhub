@@ -6,7 +6,7 @@
 // ==============================================================================
 
 import { Resource } from '../types';
-import { getCachedFileData, getResourceFileData } from './fileStorage';
+import { getCachedFileData, getResourceFileData, isCorruptedHtmlData } from './fileStorage';
 
 /**
  * Normalizes or extracts the raw data/file URL for a resource
@@ -119,6 +119,12 @@ export function openResourceOnline(resource: Resource): void {
 
   // Handle Base64 Data URL -> Blob URL for smooth native viewing in new tab
   if (fileUrl.startsWith('data:')) {
+    if (isCorruptedHtmlData(fileUrl)) {
+      if (typeof window !== 'undefined') {
+        window.location.href = `/resources/${encodeURIComponent(resource.slug || resource.id)}`;
+      }
+      return;
+    }
     try {
       if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
         const arr = fileUrl.split(',');
@@ -165,6 +171,7 @@ export function openResourceOnline(resource: Resource): void {
 }
 
 function triggerBlobDownload(dataUrl: string, fileName: string, fallbackMime?: string): boolean {
+  if (isCorruptedHtmlData(dataUrl)) return false;
   try {
     if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
       const arr = dataUrl.split(',');

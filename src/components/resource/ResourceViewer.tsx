@@ -28,9 +28,8 @@ import {
 } from 'lucide-react';
 import { Resource } from '../../types';
 import { formatLessonDate, formatRelativeTime, getResourceTypeMeta } from '../../lib/utils';
-import { parseGoogleDriveUrl } from '../../lib/googleDrive';
 import { isBookmarked, addBookmark, removeBookmark, isChecklistCompleted, toggleChecklistItem } from '../../lib/storage';
-import { getResourceFileData, saveResourceFileData } from '../../lib/fileStorage';
+import { getResourceFileData, saveResourceFileData, isCorruptedHtmlData } from '../../lib/fileStorage';
 import {
   openResourceOnline,
   downloadResourceFile,
@@ -58,14 +57,15 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [iframeError, setIframeError] = useState(false);
-  const [activeFileData, setActiveFileData] = useState<string | null>(resource.file_data || null);
+  const initialCleanData = resource.file_data && !isCorruptedHtmlData(resource.file_data) ? resource.file_data : null;
+  const [activeFileData, setActiveFileData] = useState<string | null>(initialCleanData);
   const [isLoadingFile, setIsLoadingFile] = useState<boolean>(
-    !resource.file_data && Boolean(resource.file_name || resource.id)
+    !initialCleanData && Boolean(resource.file_name || resource.id)
   );
 
   React.useEffect(() => {
     let isMounted = true;
-    if (resource.file_data) {
+    if (resource.file_data && !isCorruptedHtmlData(resource.file_data)) {
       setActiveFileData(resource.file_data);
       setIsLoadingFile(false);
       return;
@@ -74,7 +74,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
     // Attempt to load from IndexedDB
     getResourceFileData(resource.id).then((cached) => {
       if (!isMounted) return;
-      if (cached) {
+      if (cached && !isCorruptedHtmlData(cached)) {
         setActiveFileData(cached);
         setIsLoadingFile(false);
         return;
@@ -87,7 +87,7 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
             if (!isMounted) return;
             if (res.ok) {
               const contentType = res.headers.get('content-type') || '';
-              if (contentType.includes('application/json')) {
+              if (contentType.includes('application/json') || contentType.includes('text/html')) {
                 setIsLoadingFile(false);
                 return;
               }
@@ -95,12 +95,14 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
                 const reader = new FileReader();
                 reader.onloadend = () => {
                   if (isMounted && typeof reader.result === 'string') {
-                    setActiveFileData(reader.result);
-                    saveResourceFileData(resource.id, reader.result, {
-                      file_name: resource.file_name,
-                      mime_type: resource.mime_type,
-                      file_size: resource.file_size,
-                    }).catch(() => {});
+                    if (!isCorruptedHtmlData(reader.result)) {
+                      setActiveFileData(reader.result);
+                      saveResourceFileData(resource.id, reader.result, {
+                        file_name: resource.file_name,
+                        mime_type: resource.mime_type,
+                        file_size: resource.file_size,
+                      }).catch(() => {});
+                    }
                   }
                   if (isMounted) setIsLoadingFile(false);
                 };
@@ -124,10 +126,6 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
   }, [resource.id, resource.file_data]);
 
   const meta = getResourceTypeMeta(resource.resource_type);
-  const driveInfo =
-    resource.source_provider === 'google_drive'
-      ? parseGoogleDriveUrl(resource.external_url)
-      : null;
 
   const handleBookmarkToggle = () => {
     if (bookmarked) {

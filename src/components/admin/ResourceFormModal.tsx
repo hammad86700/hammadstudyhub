@@ -37,6 +37,7 @@ import {
 import { Resource, ResourceType, Subject, SourceProvider } from '../../types';
 import { parseYouTubeUrl, detectSourceProvider } from '../../lib/googleDrive';
 import { uploadLearningMaterialFile, formatFileSize, fileToBase64 } from '../../lib/cloudFileStorage';
+import { checkSupabaseConfiguration } from '../../lib/supabase';
 import { getTodayDateString, slugify } from '../../lib/utils';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -123,6 +124,7 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [isProcessingUploads, setIsProcessingUploads] = useState(false);
   const [urlValidation, setUrlValidation] = useState<any>(null);
+  const isCloudActive = checkSupabaseConfiguration();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -487,10 +489,20 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
               </div>
             </div>
 
-            <span className="px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1.5 shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>System Storage Active</span>
-            </span>
+            {isCloudActive ? (
+              <span className="px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1.5 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Supabase Cloud Storage Active</span>
+              </span>
+            ) : (
+              <span
+                className="px-2.5 py-1 rounded-lg text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/60 border border-amber-300 dark:border-amber-700 flex items-center gap-1.5 shadow-2xs"
+                title="Files > 4MB require Supabase Storage environment variables in Vercel to sync across all devices."
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span>Local Storage Mode</span>
+              </span>
+            )}
           </div>
         </div>
 
@@ -578,6 +590,12 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
                           {item.size}
                         </span>
                       </div>
+
+                      {!isCloudActive && item.file.size > 4.5 * 1024 * 1024 && (
+                        <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                          ⚠️ File ({item.size}) exceeds 4.5MB Vercel serverless limit. Add Supabase Storage in Vercel settings so other students can open this file.
+                        </p>
+                      )}
 
                       {/* Progress Bar while uploading */}
                       {item.status === 'uploading' && (
