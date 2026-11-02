@@ -29,6 +29,7 @@ import { CsvBulkImportModal } from '../../components/admin/CsvBulkImportModal';
 import { SEOHead } from '../../components/common/SEOHead';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
+import { repairAndSyncExistingResources } from '../../lib/cloudFileStorage';
 
 export const AdminResourcesPage: React.FC = () => {
   const [resourceModalOpen, setResourceModalOpen] = useState(false);
@@ -49,8 +50,9 @@ export const AdminResourcesPage: React.FC = () => {
   const { createResource, updateResource, deleteResource, bulkImportResources } =
     useResourceMutations();
 
-  // Listen for real-time resource updates
+  // Listen for real-time resource updates and auto-repair local files to cloud CDN
   React.useEffect(() => {
+    repairAndSyncExistingResources().catch(() => {});
     const handleUpdate = () => refetch();
     window.addEventListener('studyhub_resources_updated', handleUpdate);
     return () => window.removeEventListener('studyhub_resources_updated', handleUpdate);

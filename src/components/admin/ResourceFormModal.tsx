@@ -36,7 +36,12 @@ import {
 } from 'lucide-react';
 import { Resource, ResourceType, Subject, SourceProvider } from '../../types';
 import { parseYouTubeUrl, detectSourceProvider } from '../../lib/googleDrive';
-import { uploadLearningMaterialFile, formatFileSize, fileToBase64 } from '../../lib/cloudFileStorage';
+import {
+  uploadLearningMaterialFile,
+  formatFileSize,
+  fileToBase64,
+  checkStorageBucketExists,
+} from '../../lib/cloudFileStorage';
 import { checkSupabaseConfiguration } from '../../lib/supabase';
 import { getTodayDateString, slugify } from '../../lib/utils';
 import { Modal } from '../common/Modal';
@@ -124,7 +129,16 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [isProcessingUploads, setIsProcessingUploads] = useState(false);
   const [urlValidation, setUrlValidation] = useState<any>(null);
+  const [bucketMissing, setBucketMissing] = useState(false);
   const isCloudActive = checkSupabaseConfiguration();
+
+  useEffect(() => {
+    if (isOpen && isCloudActive) {
+      checkStorageBucketExists().then(({ exists }) => {
+        setBucketMissing(!exists);
+      });
+    }
+  }, [isOpen, isCloudActive]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -489,10 +503,18 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
               </div>
             </div>
 
-            {isCloudActive ? (
+            {isCloudActive && !bucketMissing ? (
               <span className="px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1.5 shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>Supabase Cloud Storage Active</span>
+              </span>
+            ) : isCloudActive && bucketMissing ? (
+              <span
+                className="px-2.5 py-1 rounded-lg text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/60 border border-amber-300 dark:border-amber-700 flex items-center gap-1.5 shadow-2xs"
+                title="Storage bucket 'studyhub-materials' is missing in your Supabase project."
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span>Bucket Setup Required</span>
               </span>
             ) : (
               <span
@@ -505,6 +527,20 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
             )}
           </div>
         </div>
+
+        {/* Supabase Storage Bucket Setup Alert */}
+        {bucketMissing && (
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2.5 shadow-2xs">
+            <AlertCircle className="w-5 h-5 shrink-0 text-amber-500 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold">Action Required: Create Storage Bucket in Supabase</p>
+              <p className="text-[11px] leading-relaxed opacity-90">
+                Your Supabase project is connected, but the storage bucket <strong>studyhub-materials</strong> has not been created yet.
+                In your Supabase Dashboard: Go to <strong>Storage</strong> → Click <strong>New Bucket</strong> → Name it <strong>studyhub-materials</strong> → Turn <strong>Public bucket</strong> ON → Click Save.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* STEP 3: Drag & Drop Multi-File Upload Zone */}
         <div>

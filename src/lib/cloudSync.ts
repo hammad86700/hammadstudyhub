@@ -32,6 +32,7 @@ import {
   deleteDemoAnnouncement,
 } from './demoStore';
 import { deleteResourceFileData, getResourceFileData, getCachedFileData, isCorruptedHtmlData } from './fileStorage';
+import { repairAndSyncExistingResources } from './cloudFileStorage';
 import { DEVICE_ID } from './realtimeSync';
 
 const NTFY_TOPIC = 'hammadstudyhub_global_sync_v2';
@@ -212,6 +213,8 @@ export async function syncWithCloud(queryClient?: QueryClient | null): Promise<v
       if (data?.snapshot) {
         ingestCloudSnapshot(data.snapshot, queryClient);
       }
+      // If any local files exist that can be upgraded to cloud CDN, repair them
+      repairAndSyncExistingResources().catch(() => {});
     } else {
       // In local development or if /api/sync is unreachable, fallback to ntfy.sh poll
       await fallbackPollFromPubSub(queryClient);

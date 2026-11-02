@@ -11,6 +11,7 @@ import { useAnnouncements } from '../../hooks/useAnnouncements';
 import { formatLessonDate, formatRelativeTime, getResourceTypeMeta } from '../../lib/utils';
 import { getRegisteredStudents, mergeRegisteredStudentsLocally, RegisteredStudentEntry } from '../../lib/demoStore';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { repairAndSyncExistingResources } from '../../lib/cloudFileStorage';
 import { StatsOverview } from '../../components/admin/StatsOverview';
 import { StorageOverviewCard } from '../../components/admin/StorageOverviewCard';
 import { ResourceFormModal } from '../../components/admin/ResourceFormModal';
@@ -31,6 +32,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [students, setStudents] = useState(() => getRegisteredStudents());
 
   React.useEffect(() => {
+    repairAndSyncExistingResources().catch(() => {});
     const fetchStudents = async () => {
       if (isSupabaseConfigured) {
         try {

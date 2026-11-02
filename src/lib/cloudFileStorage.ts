@@ -101,7 +101,16 @@ export async function uploadLearningMaterialFile(
           finalStoragePath = storagePath;
         }
       } else if (uploadErr) {
-        console.warn('Supabase storage upload returned notice (falling back to serverless API):', uploadErr.message);
+        console.warn('Supabase storage upload returned notice:', uploadErr.message);
+        if (
+          uploadErr.message?.toLowerCase().includes('bucket not found') ||
+          (uploadErr as any).statusCode === '404' ||
+          (uploadErr as any).error === 'Bucket not found'
+        ) {
+          throw new Error(
+            "Supabase Storage bucket 'studyhub-materials' does not exist! Please create a public bucket named 'studyhub-materials' in your Supabase Dashboard under Storage -> New Bucket."
+          );
+        }
       }
     } catch (sErr: any) {
       console.warn('Supabase storage exception (falling back to serverless API):', sErr?.message);
@@ -188,6 +197,22 @@ export async function resolveFileAccessUrl(resource: Resource): Promise<string> 
 }
 
 /**
+ * Checks whether the 'studyhub-materials' storage bucket exists in Supabase
+ */
+export async function checkStorageBucketExists(): Promise<{ exists: boolean; error?: string }> {
+  if (!isSupabaseConfigured) return { exists: false, error: 'Supabase is not configured' };
+  try {
+    const { data, error } = await supabase.storage.getBucket(STORAGE_BUCKET);
+    if (error || !data) {
+      return { exists: false, error: error?.message || 'Bucket not found' };
+    }
+    return { exists: true };
+  } catch (err: any) {
+    return { exists: false, error: err?.message || 'Exception checking bucket' };
+  }
+}
+
+/**
  * Scans local resources and automatically repairs previously uploaded files
  * by pushing them up to Supabase Storage and /api/files so all other students can open them.
  */
@@ -196,14 +221,15 @@ export async function repairAndSyncExistingResources(): Promise<number> {
   let repairedCount = 0;
 
   for (const r of all) {
-    // Only check resources that have a file but lack a working external_url
-    const isCloudUrl =
+    // Only skip resources that ALREADY have a working external CDN URL
+    const hasValidCdnUrl =
       r.external_url &&
-      (r.external_url.startsWith('http') || r.external_url.startsWith('/api/files')) &&
+      r.external_url.startsWith('http') &&
+      !r.external_url.includes('/api/files') &&
       r.external_url !== '#' &&
       r.external_url !== 'about:blank';
 
-    if (!isCloudUrl) {
+    if (!hasValidCdnUrl) {
       // Find local file data in memory or IndexedDB
       const fileData = r.file_data || getCachedFileData(r.id) || (await getResourceFileData(r.id));
       let repairedUrl = '';
