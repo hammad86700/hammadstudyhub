@@ -12,6 +12,7 @@ import { SEOHead } from '../components/common/SEOHead';
 import { EmptyState } from '../components/common/EmptyState';
 import { addRecentlyViewed } from '../lib/storage';
 import { StudyMaterialAuthGate } from '../components/common/StudyMaterialAuthGate';
+import { syncWithCloud } from '../lib/cloudSync';
 
 export const ResourceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -55,10 +56,13 @@ export const ResourceDetailPage: React.FC = () => {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <EmptyState
-          title="Resource Not Found"
-          description="The study resource you requested does not exist or may have been unlisted."
-          actionLabel="Return to Subjects"
-          onAction={() => window.history.back()}
+          title="Material Not Found"
+          description="This learning material may still be synchronizing across devices or was removed."
+          actionLabel="Sync with Cloud & Retry"
+          onAction={() => {
+            syncWithCloud();
+            setTimeout(() => window.location.reload(), 600);
+          }}
         />
       </div>
     );

@@ -6,7 +6,7 @@
 // ==============================================================================
 
 import { Resource } from '../types';
-import { getCachedFileData } from './fileStorage';
+import { getCachedFileData, getResourceFileData } from './fileStorage';
 
 /**
  * Normalizes or extracts the raw data/file URL for a resource
@@ -164,95 +164,101 @@ export function openResourceOnline(resource: Resource): void {
   }
 }
 
-/**
- * OPTION 2: Download Resource Directly to user's device
- */
-export async function downloadResourceFile(resource: Resource): Promise<void> {
-  const fileUrl = getResourceFileUrl(resource);
-  if (!fileUrl) {
-    alert('File download is currently unavailable. Please contact the administrator.');
-    return;
-  }
-
-  const fileName = getDownloadFileName(resource);
-
-  // 1. Base64 Data URL -> Blob -> Direct Download
-  if (fileUrl.startsWith('data:')) {
-    try {
-      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-        const arr = fileUrl.split(',');
-        const mime = arr[0].match(/:(.*?);/)?.[1] || resource.mime_type || 'application/octet-stream';
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const blob = new Blob([u8arr], { type: mime });
-        const blobUrl = URL.createObjectURL(blob);
-
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-        return;
-      }
-
-      // Fallback if URL.createObjectURL is unavailable
-      const link = document.createElement('a');
-      link.href = fileUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return;
-    } catch (err) {
-      console.error('Data URL download error:', err);
-    }
-  }
-
-  // 2. If it is an /api/files URL, append &download=true so the server streams Content-Disposition: attachment
-  if (fileUrl.includes('/api/files')) {
-    const dlUrl = fileUrl.includes('?') ? `${fileUrl}&download=true` : `${fileUrl}?download=true`;
-    const link = document.createElement('a');
-    link.href = dlUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    return;
-  }
-
-  // 3. For Supabase Storage and external URLs, fetch as blob to force browser to save directly to disk
+function triggerBlobDownload(dataUrl: string, fileName: string, fallbackMime?: string): boolean {
   try {
-    const res = await fetch(fileUrl);
-    if (res.ok && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-      const blob = await res.blob();
+    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      const arr = dataUrl.split(',');
+      const mime = arr[0].match(/:(.*?);/)?.[1] || fallbackMime || 'application/octet-stream';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const blob = new Blob([u8arr], { type: mime });
       const blobUrl = URL.createObjectURL(blob);
+
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 2500);
-      return;
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+      return true;
     }
-  } catch (fetchErr) {
-    console.warn('Direct blob download notice, falling back to direct anchor:', fetchErr);
+  } catch (err) {
+    console.error('Blob conversion download error:', err);
+  }
+  return false;
+}
+
+/**
+ * OPTION 2: Download Resource Directly to user's device
+ */
+export async function downloadResourceFile(resource: Resource): Promise<void> {
+  const fileUrl = getResourceFileUrl(resource);
+  const fileName = getDownloadFileName(resource);
+
+  // 1. Base64 Data URL -> Blob -> Direct Download
+  if (fileUrl && fileUrl.startsWith('data:')) {
+    if (triggerBlobDownload(fileUrl, fileName, resource.mime_type)) return;
   }
 
-  // Fallback anchor click
-  const link = document.createElement('a');
-  link.href = fileUrl;
-  link.download = fileName;
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  // 2. Check local persistent IndexedDB
+  try {
+    const cachedData = await getResourceFileData(resource.id);
+    if (cachedData && cachedData.startsWith('data:')) {
+      if (triggerBlobDownload(cachedData, fileName, resource.mime_type)) return;
+    }
+  } catch {}
+
+  // 3. Remote /api/files or Cloud CDN URL: Fetch as binary Blob
+  if (fileUrl) {
+    try {
+      const rawTarget = fileUrl.includes('/api/files')
+        ? (fileUrl.includes('?') ? `${fileUrl}&download=true` : `${fileUrl}?download=true`)
+        : fileUrl;
+
+      const fetchTarget =
+        rawTarget.startsWith('/') && typeof window !== 'undefined' && window.location?.origin
+          ? `${window.location.origin}${rawTarget}`
+          : rawTarget;
+
+      const res = await fetch(fetchTarget, {
+        headers: { Accept: 'application/octet-stream, application/pdf, */*' },
+      });
+
+      if (res && res.ok) {
+        const contentType = res.headers?.get ? res.headers.get('content-type') || '' : '';
+        // Only download if it is a real file payload (not HTML/JSON redirect or error page)
+        if (!contentType.includes('text/html') && !contentType.includes('application/json')) {
+          const blob = await res.blob();
+          if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+            return;
+          }
+        }
+      }
+    } catch (fetchErr) {
+      console.warn('Direct blob download notice:', fetchErr);
+    }
+  }
+
+  // 4. Safe Fallback: Navigate to the student viewer where document is loaded & presented
+  if (typeof window !== 'undefined' && window.location && window.location.pathname !== `/resources/${resource.id}`) {
+    try {
+      window.location.href = `/resources/${encodeURIComponent(resource.id)}`;
+    } catch {
+      // Non-blocking in test envs
+    }
+  }
 }

@@ -168,15 +168,21 @@ describe('Cross-Device Learning Materials Access & Download System', () => {
     expect(studentBResource).toBeDefined();
 
     // Verify Student B downloads the file
+    if (typeof URL.createObjectURL !== 'function') {
+      URL.createObjectURL = vi.fn(() => 'blob:http://localhost/mock-blob-b');
+      URL.revokeObjectURL = vi.fn();
+    }
+
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
+      headers: { get: () => 'application/pdf' },
       blob: async () => new Blob(['dummy binary content'], { type: 'application/pdf' }),
     } as any);
 
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     await downloadResourceFile(studentBResource!);
-    expect(fetchSpy).toHaveBeenCalledWith(syncPayloadResource.external_url);
+    expect(fetchSpy).toHaveBeenCalledWith(syncPayloadResource.external_url, expect.any(Object));
   });
 
   it('Scenario 4: Fallback to serverless /api/files streaming when cloud storage URL is missing', async () => {
@@ -208,6 +214,17 @@ describe('Cross-Device Learning Materials Access & Download System', () => {
 
     const resolvedUrl = await resolveFileAccessUrl(resolved);
     expect(resolvedUrl).toBe('/api/files?id=res-fallback-005');
+
+    if (typeof URL.createObjectURL !== 'function') {
+      URL.createObjectURL = vi.fn(() => 'blob:http://localhost/mock-blob-4');
+      URL.revokeObjectURL = vi.fn();
+    }
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'application/pdf' },
+      blob: async () => new Blob(['dummy pdf'], { type: 'application/pdf' }),
+    } as any);
 
     // When student downloads, it requests /api/files?id=...&download=true
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});

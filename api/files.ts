@@ -234,7 +234,7 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
     if (!fileRecord || !fileRecord.file_data) {
       const acceptHeader = (req.headers?.['accept'] as string) || '';
-      if (acceptHeader.includes('text/html') || !acceptHeader.includes('application/json')) {
+      if (!download && (acceptHeader.includes('text/html') || !acceptHeader.includes('application/json'))) {
         // Seamlessly redirect browser navigation directly to the student portal resource viewer
         res.setHeader('Location', `/resources/${encodeURIComponent(id)}`);
         return res.status(302).end();

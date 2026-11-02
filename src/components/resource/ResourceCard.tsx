@@ -121,7 +121,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
       openResourceOnline(resource);
       return;
     }
-    navigate(`/resources/${resource.slug || resource.id}`);
+    navigate(`/resources/${resource.id}`);
   };
 
   const handleDownloadClick = (e: React.MouseEvent) => {
@@ -207,7 +207,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
         <div>
           <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
             <Link
-              to={isLoggedIn ? `/resources/${resource.slug || resource.id}` : '/signup'}
+              to={isLoggedIn ? `/resources/${resource.id}` : '/signup'}
               className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors focus:outline-none inline-flex items-center gap-1.5 group cursor-pointer"
               title={isLoggedIn ? 'Open in study viewer' : 'Sign up to access this study material'}
             >
@@ -307,7 +307,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
 
           {/* Full Viewer Link */}
           <Link
-            to={`/resources/${resource.slug || resource.id}`}
+            to={`/resources/${resource.id}`}
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 text-xs shrink-0"
             title="Open in Full Study Viewer"
           >

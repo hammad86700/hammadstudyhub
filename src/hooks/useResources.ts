@@ -11,6 +11,7 @@ import {
   saveDemoResource,
   deleteDemoResource,
   getDemoSubjects,
+  mergeResourcesLocally,
 } from '../lib/demoStore';
 import { resolveEmbedUrl, detectSourceProvider } from '../lib/googleDrive';
 import { slugify } from '../lib/utils';
@@ -192,42 +193,69 @@ export function useResources(
 export function useResource(idOrSlug: string) {
   return useQuery({
     queryKey: ['resource', idOrSlug],
+    staleTime: 1000 * 5, // 5 seconds fresh
     queryFn: async (): Promise<Resource | null> => {
       if (!idOrSlug) return null;
 
+      // 1. Try Supabase if configured
       if (isSupabaseConfigured) {
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          idOrSlug
-        );
-        let query = supabase
-          .from('resources')
-          .select(`
-            *,
-            subject:subjects(*)
-          `);
+        try {
+          // Check by ID first
+          let { data } = await supabase
+            .from('resources')
+            .select(`*, subject:subjects(*)`)
+            .eq('id', idOrSlug)
+            .maybeSingle();
 
-        if (isUUID) {
-          query = query.eq('id', idOrSlug);
-        } else {
-          query = query.eq('slug', idOrSlug);
-        }
+          // If not found by ID, check by slug
+          if (!data) {
+            const bySlug = await supabase
+              .from('resources')
+              .select(`*, subject:subjects(*)`)
+              .eq('slug', idOrSlug)
+              .maybeSingle();
+            data = bySlug.data;
+          }
 
-        const { data, error } = await query.single();
-        if (error) {
-          console.error('Error fetching resource:', error.message);
-          return null;
+          if (data) {
+            const resData = data as Resource;
+            saveDemoResource(resData);
+            return resData;
+          }
+        } catch (dbErr) {
+          console.warn('Supabase useResource notice:', dbErr);
         }
-        return data as Resource;
-      } else {
-        const resources = getDemoResources();
-        const subjects = getDemoSubjects();
-        const found = resources.find((r) => r.id === idOrSlug || r.slug === idOrSlug);
-        if (!found) return null;
-        return {
-          ...found,
-          subject: subjects.find((s) => s.id === found.subject_id),
-        };
       }
+
+      // 2. Check local memory / localStorage
+      const localResources = getDemoResources();
+      const localSubjects = getDemoSubjects();
+      let found = localResources.find((r) => r.id === idOrSlug || r.slug === idOrSlug);
+
+      // 3. If not found in local store, fetch directly from central /api/sync store!
+      if (!found) {
+        try {
+          const res = await fetch('/api/sync');
+          if (res.ok) {
+            const syncPayload = await res.json();
+            const remoteList = syncPayload?.snapshot?.resources;
+            if (Array.isArray(remoteList)) {
+              mergeResourcesLocally(remoteList);
+              found = remoteList.find((r: any) => r.id === idOrSlug || r.slug === idOrSlug);
+            }
+          }
+        } catch (syncErr) {
+          console.warn('/api/sync fetch fallback in useResource:', syncErr);
+        }
+      }
+
+      if (!found) return null;
+
+      const currentSubjects = getDemoSubjects();
+      return {
+        ...found,
+        subject: found.subject || currentSubjects.find((s) => s.id === found.subject_id),
+      };
     },
     enabled: Boolean(idOrSlug),
   });
