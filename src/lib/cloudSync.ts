@@ -146,7 +146,7 @@ export function ingestCloudSnapshot(
 export async function syncWithCloud(queryClient?: QueryClient | null): Promise<void> {
   if (isSyncInProgress) return;
   const now = Date.now();
-  if (now - lastSyncTimestamp < 1500) return; // Debounce rapid back-to-back triggers
+  if (now - lastSyncTimestamp < 3500) return; // Debounce rapid back-to-back triggers
 
   isSyncInProgress = true;
   lastSyncTimestamp = now;
@@ -154,28 +154,22 @@ export async function syncWithCloud(queryClient?: QueryClient | null): Promise<v
   try {
     const localSubjects = getDemoSubjects();
     const rawLocalResources = getDemoResources();
-    const localResources = await Promise.all(
-      rawLocalResources.map(async (r) => {
-        let fileData: string | undefined = r.file_data || (getCachedFileData(r.id) ?? undefined);
-        if (!fileData) {
-          try {
-            const raw = await getResourceFileData(r.id);
-            if (raw) fileData = raw;
-          } catch {
-            // ignore
-          }
-        }
-        if (fileData && isCorruptedHtmlData(fileData)) {
-          fileData = undefined;
-        }
-        // Keep files up to 3.5MB to stay well under Vercel serverless request limits
-        if (fileData && fileData.length > 3.5 * 1024 * 1024) {
-          const { file_data: _, ...rest } = r;
-          return rest;
-        }
-        return { ...r, file_data: fileData };
-      })
-    );
+
+    // Lightweight sync: Sync metadata without loading multi-megabyte binary strings into memory
+    const localResources = rawLocalResources.map((r) => {
+      // If resource already has a public cloud URL, don't burden payload with binary data
+      if (r.external_url && r.external_url.startsWith('http') && !r.external_url.includes('/api/files')) {
+        const { file_data: _, ...metadataOnly } = r;
+        return metadataOnly;
+      }
+      // For local-only files, keep small in-memory payload only
+      if (r.file_data && r.file_data.length <= 500 * 1024) {
+        return r;
+      }
+      const { file_data: _, ...metadataOnly } = r;
+      return metadataOnly;
+    });
+
     const localStudents = getRegisteredStudents();
     const localAnnouncements = getDemoAnnouncements();
     const localChats = getAllChatMessages().slice(-30);
@@ -188,7 +182,7 @@ export async function syncWithCloud(queryClient?: QueryClient | null): Promise<v
     });
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     const res = await fetch(API_SYNC_URL, {
       method: 'POST',
@@ -213,8 +207,6 @@ export async function syncWithCloud(queryClient?: QueryClient | null): Promise<v
       if (data?.snapshot) {
         ingestCloudSnapshot(data.snapshot, queryClient);
       }
-      // If any local files exist that can be upgraded to cloud CDN, repair them
-      repairAndSyncExistingResources().catch(() => {});
     } else {
       // In local development or if /api/sync is unreachable, fallback to ntfy.sh poll
       await fallbackPollFromPubSub(queryClient);
@@ -461,10 +453,10 @@ export function initCloudSync(queryClient: QueryClient): () => void {
   // 2. Perform initial background sync
   syncWithCloud(queryClient);
 
-  // 3. Periodic Background Sync Heartbeat (every 8 seconds)
+  // 3. Periodic Background Sync Heartbeat (every 30 seconds)
   intervalTimer = setInterval(() => {
     syncWithCloud(queryClient);
-  }, 8000);
+  }, 30000);
 
   // 4. Focus & Visibility Sync (triggers whenever laptop tab is activated or phone unlocked)
   const handleFocus = () => {

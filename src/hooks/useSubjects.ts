@@ -10,16 +10,20 @@ import {
   saveDemoSubject,
   deleteDemoSubject,
   getDemoResources,
+  mergeSubjectsLocally,
 } from '../lib/demoStore';
 import { slugify } from '../lib/utils';
 import { broadcastDataChange } from '../lib/realtimeSync';
 
 export function useSubjects(filters?: SubjectFilters) {
   return useQuery({
-    queryKey: ['subjects', filters],
-    refetchInterval: 10000,
-    refetchOnWindowFocus: true,
-    staleTime: 0,
+    queryKey: [
+      'subjects',
+      Boolean(filters?.featuredOnly),
+      filters?.programId || '',
+      filters?.searchQuery || '',
+    ],
+    staleTime: 1000 * 60, // 60 seconds fresh cache
     queryFn: async (): Promise<Subject[]> => {
       let subjects: Subject[] = [];
       const localSubjects = getDemoSubjects();
@@ -47,10 +51,8 @@ export function useSubjects(filters?: SubjectFilters) {
           const { data, error } = await query;
           if (!error && data) {
             subjects = ((data as Subject[]) || []).filter((s) => !s.id.startsWith('44444444-'));
-            // Hydrate local store with remote subjects
-            subjects.forEach((s) => {
-              saveDemoSubject(s);
-            });
+            // Batch merge remote subjects into local cache
+            mergeSubjectsLocally(subjects);
           } else if (error) {
             console.warn('Supabase subjects fetch notice (using local store):', error.message);
           }

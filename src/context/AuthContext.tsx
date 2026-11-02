@@ -132,8 +132,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 1. Immediately check local session (covers Admin, CR, GR, and Student)
     const hasLocal = restoreLocalSession();
 
+    // 2. Safety timeout: Never allow the application to remain stuck on a loading screen longer than 1.5 seconds
+    const safetyTimer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1500);
+
     if (isSupabaseConfigured) {
       supabase.auth.getSession().then(({ data: { session } }) => {
+        clearTimeout(safetyTimer);
         if (session?.user) {
           setSession(session);
           setUser(session.user);
@@ -148,6 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsLoading(false);
         }
       }).catch(() => {
+        clearTimeout(safetyTimer);
         setIsLoading(false);
       });
 
@@ -169,9 +176,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       return () => {
+        clearTimeout(safetyTimer);
         subscription.unsubscribe();
       };
     } else {
+      clearTimeout(safetyTimer);
       if (!hasLocal) {
         setUser(null);
         setProfile(null);
@@ -216,7 +225,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     window.addEventListener('studyhub_students_updated', checkRoleUpdates);
     window.addEventListener('focus', checkRoleUpdates);
-    const interval = setInterval(checkRoleUpdates, 10000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        checkRoleUpdates();
+      }
+    }, 30000);
 
     return () => {
       window.removeEventListener('studyhub_students_updated', checkRoleUpdates);

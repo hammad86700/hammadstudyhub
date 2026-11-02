@@ -22,11 +22,20 @@ export function useResources(
   filters?: ResourceFilters,
   options: { includeDrafts?: boolean } = {}
 ) {
+  const includeDrafts = Boolean(options.includeDrafts);
+
   return useQuery({
-    queryKey: ['resources', subjectIdOrSlug, filters, options],
-    refetchInterval: 8000,
-    refetchOnWindowFocus: true,
-    staleTime: 0,
+    queryKey: [
+      'resources',
+      subjectIdOrSlug || 'all',
+      filters?.resourceType || 'all',
+      filters?.dateFrom || '',
+      filters?.dateTo || '',
+      filters?.chapter || '',
+      filters?.sortOrder || '',
+      includeDrafts,
+    ],
+    staleTime: 1000 * 30, // 30 seconds fresh cache
     queryFn: async (): Promise<Resource[]> => {
       let resources: Resource[] = [];
       const localResources = getDemoResources();
@@ -43,7 +52,7 @@ export function useResources(
             .order('lesson_date', { ascending: filters?.sortOrder === 'date-asc' })
             .order('published_at', { ascending: false });
 
-          if (!options.includeDrafts) {
+          if (!includeDrafts) {
             query = query.eq('status', 'published');
           }
 
@@ -87,10 +96,8 @@ export function useResources(
             resources = ((data as Resource[]) || []).filter(
               (r) => !r.id.startsWith('55555555-') && !r.subject_id.startsWith('44444444-')
             );
-            // Hydrate local cache and IndexedDB with data from Supabase for zero-latency cross-device access
-            resources.forEach((r) => {
-              saveDemoResource(r);
-            });
+            // Batch merge remote records into local cache in a single non-blocking pass
+            mergeResourcesLocally(resources);
           } else if (error) {
             console.warn('Supabase resources fetch notice (using local store):', error.message);
           }

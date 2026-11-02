@@ -61,10 +61,17 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [iframeError, setIframeError] = useState(false);
+  const hasDirectCloudUrl = Boolean(
+    resource.external_url &&
+    resource.external_url.startsWith('http') &&
+    !resource.external_url.includes('/api/files') &&
+    resource.external_url !== '#' &&
+    resource.external_url !== 'about:blank'
+  );
   const initialCleanData = resource.file_data && !isCorruptedHtmlData(resource.file_data) ? resource.file_data : null;
   const [activeFileData, setActiveFileData] = useState<string | null>(initialCleanData);
   const [isLoadingFile, setIsLoadingFile] = useState<boolean>(
-    !initialCleanData && Boolean(resource.file_name || resource.id)
+    !initialCleanData && !hasDirectCloudUrl && Boolean(resource.file_name || resource.id)
   );
   const [viewerMode, setViewerMode] = useState<'reader' | 'stream'>('reader');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -87,19 +94,35 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
       return;
     }
 
-    // Attempt to load from IndexedDB
+    // If we already have a direct public cloud URL, don't block the screen
+    if (hasDirectCloudUrl) {
+      setIsLoadingFile(false);
+    }
+
+    // Safety timeout: Never let the document preview stay stuck loading longer than 3.5s
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) setIsLoadingFile(false);
+    }, 3500);
+
+    // Attempt to load cached offline copy from IndexedDB
     getResourceFileData(resource.id).then((cached) => {
       if (!isMounted) return;
       if (cached && !isCorruptedHtmlData(cached)) {
         setActiveFileData(cached);
         setIsLoadingFile(false);
+        clearTimeout(safetyTimeout);
         return;
       }
 
-      // If not in IndexedDB, fetch binary stream from /api/files
-      if (resource.id) {
-        fetch(`/api/files?id=${encodeURIComponent(resource.id)}`)
+      // If not in IndexedDB and no direct cloud URL, fetch from /api/files with abort signal
+      if (resource.id && !hasDirectCloudUrl) {
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 3000);
+
+        fetch(`/api/files?id=${encodeURIComponent(resource.id)}`, { signal: controller.signal })
           .then((res) => {
+            clearTimeout(fetchTimeout);
+            clearTimeout(safetyTimeout);
             if (!isMounted) return;
             if (res.ok) {
               const contentType = res.headers.get('content-type') || '';
@@ -138,8 +161,9 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
 
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimeout);
     };
-  }, [resource.id, resource.file_data]);
+  }, [resource.id, resource.file_data, hasDirectCloudUrl]);
 
   const meta = getResourceTypeMeta(resource.resource_type);
 

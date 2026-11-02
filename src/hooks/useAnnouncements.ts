@@ -9,15 +9,16 @@ import {
   getDemoAnnouncements,
   saveDemoAnnouncement,
   deleteDemoAnnouncement,
+  mergeAnnouncementsLocally,
 } from '../lib/demoStore';
 import { broadcastDataChange } from '../lib/realtimeSync';
 
 export function useAnnouncements(options: { includeDrafts?: boolean } = {}) {
+  const includeDrafts = Boolean(options.includeDrafts);
+
   return useQuery({
-    queryKey: ['announcements', options],
-    refetchInterval: 10000,
-    refetchOnWindowFocus: true,
-    staleTime: 0,
+    queryKey: ['announcements', includeDrafts],
+    staleTime: 1000 * 30, // 30 seconds fresh cache
     queryFn: async (): Promise<Announcement[]> => {
       if (isSupabaseConfigured) {
         let query = supabase
@@ -29,7 +30,7 @@ export function useAnnouncements(options: { includeDrafts?: boolean } = {}) {
           .order('is_pinned', { ascending: false })
           .order('published_at', { ascending: false });
 
-        if (!options.includeDrafts) {
+        if (!includeDrafts) {
           query = query.eq('status', 'published');
         }
 
@@ -42,10 +43,8 @@ export function useAnnouncements(options: { includeDrafts?: boolean } = {}) {
             a.title !== 'Mid-Term Examination Schedule Announced' &&
             a.title !== 'CS-101 Programming Lab 02 Submission Deadline'
         );
-        // Hydrate local cache
-        filtered.forEach((a) => {
-          saveDemoAnnouncement(a);
-        });
+        // Batch merge into local cache
+        mergeAnnouncementsLocally(filtered);
         return filtered;
       } else {
         let list = getDemoAnnouncements();

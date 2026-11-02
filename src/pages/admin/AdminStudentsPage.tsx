@@ -76,7 +76,11 @@ export const AdminStudentsPage: React.FC = () => {
     };
     window.addEventListener('studyhub_students_updated', handleUpdate);
     window.addEventListener('focus', fetchRemoteStudents);
-    const interval = setInterval(fetchRemoteStudents, 8000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchRemoteStudents();
+      }
+    }, 30000);
 
     return () => {
       window.removeEventListener('studyhub_students_updated', handleUpdate);

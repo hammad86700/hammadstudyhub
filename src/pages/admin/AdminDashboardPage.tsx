@@ -56,7 +56,11 @@ export const AdminDashboardPage: React.FC = () => {
     const handleUpdate = () => fetchStudents();
     window.addEventListener('studyhub_students_updated', handleUpdate);
     window.addEventListener('focus', handleUpdate);
-    const interval = setInterval(fetchStudents, 10000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchStudents();
+      }
+    }, 30000);
 
     return () => {
       window.removeEventListener('studyhub_students_updated', handleUpdate);

@@ -44,12 +44,12 @@ import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { initRealtimeSync } from './lib/realtimeSync';
 import { repairAndSyncExistingResources } from './lib/cloudFileStorage';
 
-// Configure TanStack Query with aggressive multi-device sync settings
+// Configure TanStack Query for blazing speed, zero freezing, and event-driven realtime updates
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 2, // 2 seconds fresh
-      refetchOnWindowFocus: true, // Auto-sync immediately when returning to laptop window
+      staleTime: 1000 * 30, // 30 seconds fresh cache
+      refetchOnWindowFocus: false, // Prevents sudden UI lockups and refetch floods on every window click
       refetchOnReconnect: true, // Auto-sync when reconnecting to network
       retry: 1,
     },

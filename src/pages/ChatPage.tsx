@@ -114,7 +114,11 @@ export const ChatPage: React.FC = () => {
     window.addEventListener('studyhub_students_updated', handleUpdate);
     window.addEventListener('studyhub_chat_updated', handleUpdate);
     window.addEventListener('focus', handleUpdate);
-    const interval = setInterval(handleUpdate, 3000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        handleUpdate();
+      }
+    }, 6000);
 
     return () => {
       window.removeEventListener('studyhub_students_updated', handleUpdate);
