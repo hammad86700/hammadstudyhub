@@ -19,7 +19,7 @@ export type SourceProvider =
 
 export type PublicationStatus = 'draft' | 'published' | 'archived';
 
-export type UserRole = 'admin' | 'cr' | 'gr' | 'student';
+export type UserRole = 'admin' | 'cr' | 'gr' | 'teacher' | 'student';
 export type Gender = 'male' | 'female';
 
 export interface UserProfile {
@@ -32,6 +32,8 @@ export interface UserProfile {
   roll_no?: string;
   program_name?: string;
   semester?: string;
+  assigned_subject_ids?: string[];
+  teacher_status?: 'pending' | 'approved' | 'rejected';
   created_at: string;
   updated_at: string;
 }
@@ -45,6 +47,110 @@ export interface StudentRegistrationInput {
   roll_no?: string;
   program_name?: string;
   semester?: string;
+}
+
+export interface TeacherRegistrationInput {
+  display_name: string;
+  email: string;
+  password: string;
+  gender?: Gender;
+  phone?: string;
+  requested_subject_ids: string[];
+}
+
+export interface TeacherApplication {
+  id: string;
+  teacher_id: string;
+  display_name: string;
+  email: string;
+  phone?: string;
+  gender?: Gender;
+  requested_subject_ids: string[];
+  approved_subject_ids: string[];
+  status: 'pending' | 'approved' | 'rejected';
+  rejection_reason?: string;
+  reviewed_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubmissionFile {
+  id: string;
+  file_name: string;
+  file_size: string;
+  mime_type: string;
+  file_url: string;
+  file_data?: string; // Base64 data URL for instant offline & cross-device viewing
+  storage_path?: string;
+}
+
+export interface StudentAssignmentSubmission {
+  id: string;
+  student_id: string;
+  student_name: string;
+  roll_no: string;
+  subject_id: string;
+  subject_name?: string;
+  title: string;
+  description?: string;
+  files: SubmissionFile[];
+  status: 'submitted' | 'reviewed';
+  review_feedback?: string;
+  review_marks?: string;
+  reviewed_at?: string;
+  reviewed_by?: string;
+  submitted_at: string;
+  updated_at: string;
+}
+
+export interface TeacherNotification {
+  id: string;
+  teacher_id: string;
+  submission_id: string;
+  student_name: string;
+  roll_no: string;
+  subject_id: string;
+  subject_name: string;
+  assignment_title: string;
+  submission_time: string;
+  read: boolean;
+  created_at: string;
+}
+
+export type QuestionType = 'mcq' | 'true_false' | 'short_answer' | 'descriptive';
+
+export interface TestQuestion {
+  id: string;
+  subject_id: string;
+  chapter?: string;
+  topic?: string;
+  question_type: QuestionType;
+  question_text: string;
+  options?: string[]; // 4 options for MCQ
+  correct_answer: string;
+  marks: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  created_at: string;
+}
+
+export interface TeacherTest {
+  id: string;
+  teacher_id: string;
+  subject_id: string;
+  title: string;
+  instructions?: string;
+  test_date: string;
+  start_time?: string;
+  end_time?: string;
+  duration_minutes: number;
+  total_marks: number;
+  attempts_allowed: number;
+  shuffle_questions: boolean;
+  shuffle_options: boolean;
+  status: 'draft' | 'scheduled' | 'published';
+  questions: TestQuestion[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PlatformSocials {

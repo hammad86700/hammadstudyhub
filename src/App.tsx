@@ -40,7 +40,9 @@ import { AdminSubjectsPage } from './pages/admin/AdminSubjectsPage';
 import { AdminResourcesPage } from './pages/admin/AdminResourcesPage';
 import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
 import { AdminStudentsPage } from './pages/admin/AdminStudentsPage';
+import { AdminTeachersPage } from './pages/admin/AdminTeachersPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
+import { TeacherDashboardPage } from './pages/teacher/TeacherDashboardPage';
 import { initRealtimeSync } from './lib/realtimeSync';
 import { repairAndSyncExistingResources } from './lib/cloudFileStorage';
 
@@ -111,6 +113,16 @@ export const App: React.FC = () => {
                   element={
                     <ProtectedRoute>
                       <StudentDashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Protected Teacher Portal */}
+                <Route
+                  path="/teacher"
+                  element={
+                    <ProtectedRoute requireTeacher>
+                      <TeacherDashboardPage />
                     </ProtectedRoute>
                   }
                 />
@@ -192,6 +204,7 @@ export const App: React.FC = () => {
                 <Route path="resources" element={<AdminResourcesPage />} />
                 <Route path="announcements" element={<AdminAnnouncementsPage />} />
                 <Route path="students" element={<AdminStudentsPage />} />
+                <Route path="teachers" element={<AdminTeachersPage />} />
                 <Route path="settings" element={<AdminSettingsPage />} />
               </Route>
             </Routes>

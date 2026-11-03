@@ -27,6 +27,7 @@ import {
   Sparkles,
   ChevronRight,
   GraduationCap,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSubjects } from '../hooks/useSubjects';
@@ -38,6 +39,7 @@ import {
   getStudentNotifications,
   getUnreadNotificationCount,
 } from '../lib/notifications';
+import { StudentAssignmentsList } from '../components/assignment/StudentAssignmentsList';
 import { SEOHead } from '../components/common/SEOHead';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
@@ -52,6 +54,7 @@ export const StudentDashboardPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'materials' | 'assignments'>('materials');
 
   // Live Database Queries
   const { data: subjects = [], isLoading: subjectsLoading } = useSubjects();
@@ -258,8 +261,44 @@ export const StudentDashboardPage: React.FC = () => {
           </aside>
         )}
 
-        {/* 3. YOUR SUBJECTS — THE PRIMARY FOCUS OF THE PLATFORM */}
-        <section className="space-y-4">
+        {/* Navigation Mode Switcher: Study Materials vs Assignment Submissions */}
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab('materials')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'materials'
+                ? 'bg-white dark:bg-navy-900 text-brand-600 dark:text-brand-400 shadow-subtle'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Subjects & Study Materials</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300 font-bold">
+              {subjects.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('assignments')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'assignments'
+                ? 'bg-white dark:bg-navy-900 text-brand-600 dark:text-brand-400 shadow-subtle'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            <span>My Assignment Submissions</span>
+          </button>
+        </div>
+
+        {activeTab === 'assignments' ? (
+          <StudentAssignmentsList />
+        ) : (
+          <>
+            {/* 3. YOUR SUBJECTS — THE PRIMARY FOCUS OF THE PLATFORM */}
+            <section className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-brand-50 dark:bg-brand-950/70 text-brand-600 dark:text-brand-400 flex items-center justify-center shrink-0">
@@ -398,6 +437,8 @@ export const StudentDashboardPage: React.FC = () => {
             />
           )}
         </section>
+      </>
+    )}
 
         {/* 5. ANNOUNCEMENTS & REVISION TOOLS (Clean 2-Column Grid) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

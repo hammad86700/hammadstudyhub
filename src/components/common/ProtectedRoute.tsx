@@ -10,13 +10,15 @@ import { useAuth } from '../../context/AuthContext';
 interface ProtectedRouteProps {
   children: React.ReactElement;
   requireAdmin?: boolean;
+  requireTeacher?: boolean;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requireAdmin = false,
+  requireTeacher = false,
 }) => {
-  const { isLoggedIn, isLoading, isStudyManager } = useAuth();
+  const { isLoggedIn, isLoading, isStudyManager, isTeacher, isAdmin } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -30,13 +32,18 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // 1. Not logged in -> redirect to student login
+  // 1. Not logged in -> redirect to login
   if (!isLoggedIn) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 2. Admin/CR restricted page requested by a regular student
+  // 2. Admin/CR restricted page requested by a non-manager
   if (requireAdmin && !isStudyManager) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // 3. Teacher restricted page requested by non-teacher / non-admin
+  if (requireTeacher && !isTeacher && !isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 

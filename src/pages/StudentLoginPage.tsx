@@ -25,21 +25,23 @@ export const StudentLoginPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { signIn, isLoggedIn, isAdmin, isStudyManager } = useAuth();
+  const { signIn, isLoggedIn, isAdmin, isStudyManager, isTeacher } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = (location.state as any)?.from?.pathname || (isStudyManager ? '/admin' : '/dashboard');
+  const from = (location.state as any)?.from?.pathname || (isStudyManager ? '/admin' : isTeacher ? '/teacher' : '/dashboard');
 
   React.useEffect(() => {
     if (isLoggedIn) {
       if (isStudyManager) {
         navigate('/admin', { replace: true });
+      } else if (isTeacher) {
+        navigate('/teacher', { replace: true });
       } else {
         navigate('/dashboard', { replace: true });
       }
     }
-  }, [isLoggedIn, isStudyManager, navigate]);
+  }, [isLoggedIn, isStudyManager, isTeacher, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +56,8 @@ export const StudentLoginPage: React.FC = () => {
     } else {
       if (res.profile?.role === 'admin' || res.profile?.role === 'cr' || res.profile?.role === 'gr') {
         navigate('/admin', { replace: true });
+      } else if (res.profile?.role === 'teacher') {
+        navigate('/teacher', { replace: true });
       } else {
         navigate(from || '/dashboard', { replace: true });
       }

@@ -7,13 +7,17 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { UserProfile, UserRole, StudentRegistrationInput } from '../types';
+import { UserProfile, UserRole, StudentRegistrationInput, TeacherRegistrationInput, TeacherApplication } from '../types';
 import {
   findStudentByEmail,
   registerStudent,
   getRegisteredStudents,
   upsertRegisteredStudentLocally,
 } from '../lib/demoStore';
+import {
+  submitTeacherRegistration,
+  getTeacherApplicationByEmail,
+} from '../lib/teacherAssignmentStore';
 import { broadcastDataChange } from '../lib/realtimeSync';
 
 interface AuthContextType {
@@ -24,12 +28,14 @@ interface AuthContextType {
   isCR: boolean;
   isGR: boolean;
   isStudyManager: boolean;
+  isTeacher: boolean;
   isStudent: boolean;
   isLoggedIn: boolean;
   isLoading: boolean;
   isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string; profile?: UserProfile }>;
   signUpStudent: (input: StudentRegistrationInput) => Promise<{ error?: string; profile?: UserProfile }>;
+  registerTeacher: (input: TeacherRegistrationInput) => Promise<{ success: boolean; application?: TeacherApplication; error?: string }>;
   signOut: () => Promise<void>;
   refreshProfile: () => void;
 }
@@ -364,7 +370,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 4. Local Registered Students Store (Fallback & Offline)
+      // 4. Local Registered Students & Teachers Store
       const student = findStudentByEmail(cleanEmail);
       if (student) {
         if (student.password && student.password !== password) {
@@ -372,7 +378,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { error: 'Incorrect password. Please verify your password and try again.' };
         }
 
+        // Check if this is a pending teacher account
+        const teacherApp = getTeacherApplicationByEmail(cleanEmail);
+        if (student.teacher_status === 'pending' || (teacherApp && teacherApp.status === 'pending')) {
+          setIsLoading(false);
+          return {
+            error: 'Your teacher account is pending administrator review and approval. Please check back later or contact Muhammad Hammad.',
+          };
+        }
+
+        if (student.teacher_status === 'rejected' || (teacherApp && teacherApp.status === 'rejected')) {
+          setIsLoading(false);
+          return {
+            error: 'Your teacher account application was reviewed and not approved. Please contact the administrator for more information.',
+          };
+        }
+
         const { password: _, ...safeProfile } = student;
+        if (teacherApp && teacherApp.status === 'approved') {
+          safeProfile.role = 'teacher';
+          safeProfile.assigned_subject_ids = teacherApp.approved_subject_ids || [];
+        }
+
         localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(safeProfile));
         localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
 
@@ -402,7 +429,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsLoading(false);
           return { error: 'Incorrect password. Please verify your password and try again.' };
         }
+
+        const teacherApp = getTeacherApplicationByEmail(cleanEmail);
+        if (student.teacher_status === 'pending' || (teacherApp && teacherApp.status === 'pending')) {
+          setIsLoading(false);
+          return {
+            error: 'Your teacher account is pending administrator review and approval. Please check back later or contact Muhammad Hammad.',
+          };
+        }
+
         const { password: _, ...safeProfile } = student;
+        if (teacherApp && teacherApp.status === 'approved') {
+          safeProfile.role = 'teacher';
+          safeProfile.assigned_subject_ids = teacherApp.approved_subject_ids || [];
+        }
+
         localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(safeProfile));
         localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
         setUser({
@@ -504,6 +545,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const registerTeacher = async (
+    input: TeacherRegistrationInput
+  ): Promise<{ success: boolean; application?: TeacherApplication; error?: string }> => {
+    setIsLoading(true);
+    const res = await submitTeacherRegistration(input);
+    setIsLoading(false);
+    return res;
+  };
+
   const signOut = async (): Promise<void> => {
     setIsLoading(true);
     if (isSupabaseConfigured) {
@@ -525,6 +575,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isCR = profile?.role === 'cr';
   const isGR = profile?.role === 'gr';
   const isStudyManager = isAdmin || isCR || isGR;
+  const isTeacher = profile?.role === 'teacher';
   const isStudent = profile?.role === 'student';
   const isLoggedIn = Boolean(profile);
 
@@ -538,12 +589,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isCR,
         isGR,
         isStudyManager,
+        isTeacher,
         isStudent,
         isLoggedIn,
         isLoading,
         isDemoMode,
         signIn,
         signUpStudent,
+        registerTeacher,
         signOut,
         refreshProfile,
       }}

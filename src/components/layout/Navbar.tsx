@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Clock,
   Sparkles,
+  GraduationCap,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -39,7 +40,7 @@ export const Navbar: React.FC = () => {
   const [contactModalOpen, setContactModalOpen] = useState(false);
 
   const { resolvedTheme, toggleTheme } = useTheme();
-  const { profile, isLoggedIn, isAdmin, isCR, isGR, isStudyManager, signOut } = useAuth();
+  const { profile, isLoggedIn, isAdmin, isCR, isGR, isTeacher, isStudyManager, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -198,13 +199,21 @@ export const Navbar: React.FC = () => {
               {/* Authenticated User Pill & Dropdown / Portal Action */}
               {isLoggedIn && profile ? (
                 <div className="hidden sm:flex items-center gap-2 pl-1 border-l border-slate-200 dark:border-slate-800">
-                  {isStudyManager ? (
+                  {isAdmin || isCR || isGR ? (
                     <Link
                       to="/admin"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-xs"
                     >
                       <ShieldCheck className="w-3.5 h-3.5" />
                       <span>{isAdmin ? 'Admin' : isCR ? 'CR Portal' : 'GR Portal'}</span>
+                    </Link>
+                  ) : isTeacher ? (
+                    <Link
+                      to="/teacher"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-xs"
+                    >
+                      <GraduationCap className="w-3.5 h-3.5" />
+                      <span>Teacher Portal</span>
                     </Link>
                   ) : (
                     <Link
@@ -316,6 +325,17 @@ export const Navbar: React.FC = () => {
                         {roleLabel}
                       </span>
                     </div>
+
+                    {isTeacher && (
+                      <Link
+                        to="/teacher"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-white bg-emerald-600"
+                      >
+                        <GraduationCap className="w-4 h-4" />
+                        <span>Teacher Portal</span>
+                      </Link>
+                    )}
 
                     {isStudyManager && (
                       <Link
