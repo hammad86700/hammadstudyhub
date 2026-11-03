@@ -1,6 +1,6 @@
 // ==============================================================================
-// HAMMAD STUDYHUB — PUBLIC NAVIGATION BAR
-// Includes Student Login/Signup, Contact Admin (WhatsApp & Instagram), and Chat
+// HAMMAD STUDYHUB — PUBLIC & STUDENT NAVIGATION BAR
+// Clean, minimal, modern educational SaaS navigation
 // ==============================================================================
 
 import React, { useState } from 'react';
@@ -14,9 +14,6 @@ import {
   X,
   BookOpen,
   Bell,
-  ShieldAlert,
-  Info,
-  Clock,
   LayoutDashboard,
   MessageSquare,
   MessageCircle,
@@ -24,9 +21,9 @@ import {
   LogIn,
   LogOut,
   User,
-  Crown,
-  Award,
   ShieldCheck,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -81,17 +78,17 @@ export const Navbar: React.FC = () => {
 
   // Authenticated Student Nav vs Public Website Nav
   const publicNavLinks = [
-    { label: 'About', href: '/about', icon: Info },
-    { label: 'Announcements', href: '/announcements', icon: Bell },
-    { label: 'Feedback', href: '/feedback', icon: MessageSquare },
+    { label: 'About', href: '/about' },
+    { label: 'Announcements', href: '/announcements' },
+    { label: 'Feedback', href: '/feedback' },
   ];
 
   const studentNavLinks = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Subjects', href: '/subjects', icon: BookOpen },
-    { label: 'Class Chat', href: '/chat', icon: MessageSquare },
     { label: 'Recent', href: '/recent', icon: Clock },
     { label: 'Announcements', href: '/announcements', icon: Bell },
+    { label: 'Class Chat', href: '/chat', icon: MessageSquare },
   ];
 
   const navLinks = isLoggedIn ? studentNavLinks : publicNavLinks;
@@ -102,57 +99,48 @@ export const Navbar: React.FC = () => {
     return false;
   };
 
+  const roleLabel = isAdmin ? 'Admin' : isCR ? 'CR' : isGR ? 'GR' : 'Student';
+
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-navy-950/95 backdrop-blur-md transition-colors duration-200">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
-            {/* Logo & Brand Mark */}
-            <Link to={isLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-2 sm:gap-3 min-w-0 group focus:outline-none">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-brand-600 to-navy-900 p-0.5 shadow-sm group-hover:shadow transition-shadow shrink-0">
-                <div className="w-full h-full rounded-[9px] sm:rounded-[10px] bg-slate-900 flex items-center justify-center">
-                  <svg
-                    className="w-4 h-4 sm:w-6 sm:h-6 text-brand-400 group-hover:scale-105 transition-transform"
-                    viewBox="0 0 512 512"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <rect x="176" y="160" width="40" height="192" rx="12" fill="#60A5FA" />
-                    <rect x="296" y="160" width="40" height="192" rx="12" fill="#60A5FA" />
-                    <path d="M188 256 L324 256" stroke="#F59E0B" strokeWidth="36" strokeLinecap="round" />
-                    <path d="M256 100 L264 124 L288 132 L264 140 L256 164 L248 140 L224 132 L248 124 Z" fill="#F59E0B" />
-                  </svg>
-                </div>
+            {/* Logo & Brand Identity */}
+            <Link
+              to={isLoggedIn ? '/dashboard' : '/'}
+              className="flex items-center gap-2.5 sm:gap-3 min-w-0 group focus:outline-none"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-brand-600 to-indigo-700 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform shrink-0">
+                <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0">
-                <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 dark:text-white truncate block">
+                <span className="text-sm sm:text-base font-black tracking-tight text-slate-900 dark:text-white truncate block leading-tight">
                   Hammad StudyHub
                 </span>
-                <span className="block text-[9px] sm:text-[10px] font-medium tracking-wide text-brand-600 dark:text-brand-400 uppercase truncate">
-                  By Muhammad Hammad
+                <span className="block text-[9px] sm:text-[10px] font-medium text-brand-600 dark:text-brand-400 tracking-wider uppercase truncate">
+                  Student Portal
                 </span>
               </div>
             </Link>
 
-            {/* Desktop Nav Links */}
+            {/* Desktop Navigation Links */}
             <nav className="hidden md:flex items-center gap-1">
               {navLinks.map((link) => {
                 const active = isActive(link.href);
-                const Icon = link.icon;
                 return (
                   <Link
                     key={link.href}
                     to={link.href}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       active
-                        ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300'
+                        ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/70 dark:text-brand-300 font-bold'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
                     <span>{link.label}</span>
                     {link.href === '/chat' && unreadChatCount > 0 && (
-                      <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-brand-600 text-white animate-pulse">
+                      <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-brand-600 text-white animate-pulse">
                         {unreadChatCount}
                       </span>
                     )}
@@ -161,37 +149,27 @@ export const Navbar: React.FC = () => {
               })}
             </nav>
 
-            {/* Actions: Contact Admin, Search, Bookmarks, Theme Toggle, Auth */}
+            {/* Actions: Search, Bookmarks, Notifications, Theme, User */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              {/* Direct Contact Admin WhatsApp / Instagram Trigger */}
-              <button
-                onClick={() => setContactModalOpen(true)}
-                className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 transition-all shadow-xs"
-                title="WhatsApp 03242779514 & Instagram not_urs_hammi"
-              >
-                <MessageCircle className="w-3.5 h-3.5 text-emerald-600 fill-current" />
-                <span>Contact Admin</span>
-              </button>
-
-              {/* Quick Search Trigger */}
+              {/* Quick Search Button */}
               <button
                 onClick={() => setSearchOpen(!searchOpen)}
-                className="p-1.5 sm:p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
-                aria-label="Open search"
+                className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
+                aria-label="Search"
+                title="Search materials (Ctrl+K)"
               >
                 <Search className="w-4 h-4" />
               </button>
 
-              {/* Bookmarks Counter */}
+              {/* Bookmarks Counter (Students) */}
               <Link
                 to="/bookmarks"
-                className={`relative p-1.5 sm:p-2 rounded-lg transition-colors ${
+                className={`relative p-2 rounded-lg transition-colors ${
                   isActive('/bookmarks')
-                    ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300'
+                    ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/70 dark:text-brand-300'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
                 }`}
                 title="Saved Bookmarks"
-                aria-label="Bookmarks"
               >
                 <Bookmark className="w-4 h-4" />
                 {bookmarkCount > 0 && (
@@ -201,13 +179,13 @@ export const Navbar: React.FC = () => {
                 )}
               </Link>
 
-              {/* Notification Bell (for Logged In Students) */}
+              {/* Notification Bell */}
               {isLoggedIn && <NotificationBell />}
 
               {/* Dark Mode Toggle */}
               <button
                 onClick={toggleTheme}
-                className="p-1.5 sm:p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
+                className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
                 aria-label="Toggle theme"
               >
                 {resolvedTheme === 'dark' ? (
@@ -217,56 +195,61 @@ export const Navbar: React.FC = () => {
                 )}
               </button>
 
-              {/* Logged in User Indicator & Study Portal */}
+              {/* Authenticated User Pill & Dropdown / Portal Action */}
               {isLoggedIn && profile ? (
-                <div className="hidden sm:flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2 pl-1 border-l border-slate-200 dark:border-slate-800">
                   {isStudyManager ? (
                     <Link
                       to="/admin"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors shadow-xs"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-xs"
                     >
-                      <LayoutDashboard className="w-3.5 h-3.5" />
-                      <span>{isAdmin ? 'Admin Portal' : isCR ? 'CR Portal' : 'GR Portal'}</span>
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>{isAdmin ? 'Admin' : isCR ? 'CR Portal' : 'GR Portal'}</span>
                     </Link>
                   ) : (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-navy-900 border border-slate-200 dark:border-slate-800 text-xs">
-                      <User className="w-3.5 h-3.5 text-brand-600" />
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[100px]">
+                    <Link
+                      to="/dashboard"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-navy-900 border border-slate-200/80 dark:border-slate-800/80 text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                      title="Your Dashboard"
+                    >
+                      <div className="w-5 h-5 rounded-full bg-brand-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                        {(profile.display_name || 'S').charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[110px]">
                         {profile.display_name.split(' ')[0]}
                       </span>
-                    </div>
+                    </Link>
                   )}
 
                   <button
                     onClick={() => signOut()}
-                    className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                    title="Sign Out"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                    title="Log Out"
                   >
                     <LogOut className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
-                <div className="hidden sm:flex items-center gap-1.5">
+                <div className="hidden sm:flex items-center gap-2 pl-1 border-l border-slate-200 dark:border-slate-800">
                   <Link
                     to="/login"
-                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-brand-600 dark:text-slate-300 dark:hover:text-white transition-colors"
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-brand-600 dark:text-slate-300 dark:hover:text-white transition-colors"
                   >
-                    Sign In
+                    Log In
                   </Link>
                   <Link
                     to="/signup"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors shadow-xs"
+                    className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-brand-600 text-white hover:bg-brand-700 transition-colors shadow-xs"
                   >
-                    <UserPlus className="w-3.5 h-3.5" />
                     <span>Sign Up</span>
                   </Link>
                 </div>
               )}
 
-              {/* Mobile Hamburger Menu */}
+              {/* Mobile Menu Hamburger */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-1.5 sm:p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
+                className="md:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
                 aria-label="Toggle mobile menu"
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -274,7 +257,7 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
-          {/* Search Expansion Bar */}
+          {/* Quick Search Dropdown Bar */}
           {searchOpen && (
             <div className="py-3 border-t border-slate-200/80 dark:border-slate-800/80 animate-in fade-in slide-in-from-top-1">
               <form onSubmit={handleSearchSubmit} className="flex gap-2">
@@ -291,7 +274,7 @@ export const Navbar: React.FC = () => {
                 </div>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-brand-600 text-white hover:bg-brand-700"
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-brand-600 text-white hover:bg-brand-700"
                 >
                   Search
                 </button>
@@ -307,12 +290,13 @@ export const Navbar: React.FC = () => {
                   key={link.href}
                   to={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold ${
+                    isActive(link.href)
+                      ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/70 dark:text-brand-300 font-bold'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <link.icon className="w-4 h-4 text-brand-500" />
-                    <span>{link.label}</span>
-                  </div>
+                  <span>{link.label}</span>
                   {link.href === '/chat' && unreadChatCount > 0 && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-600 text-white animate-pulse">
                       {unreadChatCount} new
@@ -321,39 +305,35 @@ export const Navbar: React.FC = () => {
                 </Link>
               ))}
 
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setContactModalOpen(true);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40"
-              >
-                <MessageCircle className="w-4 h-4 text-emerald-600 fill-current" />
-                <span>Contact Admin (WhatsApp & Instagram)</span>
-              </button>
-
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
                 {isLoggedIn && profile ? (
                   <>
-                    <div className="px-3 py-1 text-xs text-slate-500">
-                      Logged in as <strong>{profile.display_name}</strong> ({profile.role})
+                    <div className="px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-navy-900/60 flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-medium truncate max-w-[180px]">
+                        {profile.display_name}
+                      </span>
+                      <span className="font-bold uppercase text-[10px] px-2 py-0.5 rounded bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-300">
+                        {roleLabel}
+                      </span>
                     </div>
+
                     {isStudyManager && (
                       <Link
                         to="/admin"
                         onClick={() => setMobileMenuOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-brand-600"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-white bg-indigo-600"
                       >
-                        <LayoutDashboard className="w-4 h-4" />
-                        <span>Manage Courses & Notes</span>
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>{isAdmin ? 'Admin Dashboard' : isCR ? 'CR Portal' : 'GR Portal'}</span>
                       </Link>
                     )}
+
                     <button
                       onClick={() => {
                         signOut();
                         setMobileMenuOpen(false);
                       }}
-                      className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-red-500"
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>Sign Out</span>
@@ -364,14 +344,14 @@ export const Navbar: React.FC = () => {
                     <Link
                       to="/login"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="p-2 text-center text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+                      className="p-2.5 text-center text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
                     >
-                      Sign In
+                      Log In
                     </Link>
                     <Link
                       to="/signup"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="p-2 text-center text-xs font-semibold rounded-lg bg-brand-600 text-white"
+                      className="p-2.5 text-center text-xs font-bold rounded-lg bg-brand-600 text-white shadow-xs"
                     >
                       Sign Up
                     </Link>
@@ -383,7 +363,7 @@ export const Navbar: React.FC = () => {
         </div>
       </header>
 
-      {/* Direct Contact Admin Modal */}
+      {/* Support / Contact Admin Modal */}
       <ContactAdminModal
         isOpen={contactModalOpen}
         onClose={() => setContactModalOpen(false)}
@@ -391,3 +371,4 @@ export const Navbar: React.FC = () => {
     </>
   );
 };
+

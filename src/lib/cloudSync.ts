@@ -155,15 +155,15 @@ export async function syncWithCloud(queryClient?: QueryClient | null): Promise<v
     const localSubjects = getDemoSubjects();
     const rawLocalResources = getDemoResources();
 
-    // Lightweight sync: Sync metadata without loading multi-megabyte binary strings into memory
+    // Intelligent sync: Preserve academic document binaries up to 4MB so all students can open PDFs immediately
     const localResources = rawLocalResources.map((r) => {
-      // If resource already has a public cloud URL, don't burden payload with binary data
+      // If resource already has a permanent cloud CDN URL, don't burden sync payload with duplicate Base64 data
       if (r.external_url && r.external_url.startsWith('http') && !r.external_url.includes('/api/files')) {
         const { file_data: _, ...metadataOnly } = r;
         return metadataOnly;
       }
-      // For local-only files, keep small in-memory payload only
-      if (r.file_data && r.file_data.length <= 500 * 1024) {
+      // For uploaded materials, retain binary payload up to 4MB so cross-device sync succeeds
+      if (r.file_data && r.file_data.length <= 4 * 1024 * 1024) {
         return r;
       }
       const { file_data: _, ...metadataOnly } = r;

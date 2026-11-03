@@ -543,26 +543,26 @@ export const ResourceViewer: React.FC<ResourceViewerProps> = ({
               <div className="w-14 h-14 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-brand-400">
                 <FileText className="w-7 h-7" />
               </div>
-              <h4 className="text-lg font-bold">Study Material Access</h4>
+              <h4 className="text-lg font-bold">Study Material Syncing</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Choose whether you want to read online in your browser or download directly to your device.
+                This learning material is being processed from cloud storage. You can retry downloading, or message Muhammad Hammad directly on WhatsApp to get this PDF immediately.
               </p>
               <div className="flex items-center justify-center gap-3 flex-wrap">
                 <button
                   type="button"
-                  onClick={handleOpenOnlineClick}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold bg-slate-800 hover:bg-slate-700 text-white text-xs cursor-pointer border border-slate-700"
+                  onClick={() => setContactModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-700 text-white text-xs cursor-pointer shadow-md transition-colors"
                 >
-                  <Eye className="w-4 h-4 text-brand-400" />
-                  <span>View Online</span>
+                  <MessageCircle className="w-4 h-4 fill-current" />
+                  <span>Request on WhatsApp</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadClick}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold bg-brand-600 hover:bg-brand-700 text-white text-xs shadow-md cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold bg-brand-600 hover:bg-brand-700 text-white text-xs shadow-md cursor-pointer transition-colors"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download File</span>
+                  <span>Retry Download</span>
                 </button>
               </div>
             </div>

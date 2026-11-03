@@ -260,12 +260,12 @@ export async function downloadResourceFile(resource: Resource): Promise<void> {
     }
   }
 
-  // 4. Safe Fallback: Navigate to the student viewer where document is loaded & presented
-  if (typeof window !== 'undefined' && window.location && window.location.pathname !== `/resources/${resource.id}`) {
-    try {
+  // 4. Safe Fallback: Open student viewer or show clear notification
+  if (typeof window !== 'undefined' && window.location) {
+    if (window.location.pathname !== `/resources/${resource.id}`) {
       window.location.href = `/resources/${encodeURIComponent(resource.id)}`;
-    } catch {
-      // Non-blocking in test envs
+    } else {
+      alert('This study material is currently syncing from cloud storage. Please wait a moment and try again, or contact the Admin / CR.');
     }
   }
 }

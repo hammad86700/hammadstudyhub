@@ -263,9 +263,9 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
 
     if (!fileRecord || !fileRecord.file_data || isCorruptedHtmlData(fileRecord.file_data)) {
       const acceptHeader = (req.headers?.['accept'] as string) || '';
-      if (!download && (acceptHeader.includes('text/html') || !acceptHeader.includes('application/json'))) {
-        // Seamlessly redirect browser navigation directly to the student portal resource viewer
-        res.setHeader('Location', `/resources/${encodeURIComponent(id)}`);
+      // If browser navigated directly (e.g. clicked link or address bar), gracefully redirect to the study viewer
+      if (acceptHeader.includes('text/html') || !acceptHeader.includes('application/json')) {
+        res.setHeader('Location', `/resources/${encodeURIComponent(id)}?status=syncing`);
         return res.status(302).end();
       }
 

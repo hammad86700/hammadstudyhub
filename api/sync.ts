@@ -432,6 +432,20 @@ export default async function handler(req: VercelRequestLike, res: VercelRespons
         // Create / Update mutations
         if (entity === 'resources' && data && !store.deleted_ids[targetId]) {
           store.resources = mergeRecords(store.resources, [data]);
+          if (isCleanBinaryData(data.file_data)) {
+            if (!(globalThis as any).__studyhub_file_store__) {
+              (globalThis as any).__studyhub_file_store__ = {};
+            }
+            (globalThis as any).__studyhub_file_store__[data.id] = {
+              id: data.id,
+              file_name: data.file_name || `${data.title}.pdf`,
+              mime_type: data.mime_type || 'application/pdf',
+              file_size: data.file_size,
+              file_data: data.file_data,
+              subject_id: data.subject_id,
+              updated_at: data.updated_at || new Date().toISOString(),
+            };
+          }
         } else if (entity === 'subjects' && data && !store.deleted_ids[targetId]) {
           store.subjects = mergeRecords(store.subjects, [data]);
         } else if (entity === 'students' && data && !store.deleted_ids[targetId]) {
