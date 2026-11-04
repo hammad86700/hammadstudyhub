@@ -42,7 +42,11 @@ export const AdminLoginPage: React.FC = () => {
     if (res.error) {
       setErrorMessage(res.error);
     } else {
-      navigate(from, { replace: true });
+      if (res.profile?.role === 'teacher') {
+        navigate('/teacher', { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
     }
   };
 

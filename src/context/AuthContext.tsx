@@ -85,12 +85,26 @@ function getStoredActiveProfile(): UserProfile | null {
     if (savedUserStr) {
       const savedUser = JSON.parse(savedUserStr) as UserProfile;
       if (savedUser && savedUser.id && savedUser.email) {
+        // Check teacher applications to preserve teacher elevation
+        const teacherApp = getTeacherApplicationByEmail(savedUser.email);
+        const isApprovedTeacher = teacherApp?.status === 'approved' || savedUser.role === 'teacher';
+
         const fresh = getRegisteredStudents().find(
           (s) => s.id === savedUser.id || s.email.toLowerCase() === savedUser.email.toLowerCase()
         );
-        return fresh
-          ? { ...savedUser, role: fresh.role, display_name: fresh.display_name || savedUser.display_name }
-          : savedUser;
+
+        const effectiveRole = isApprovedTeacher ? 'teacher' : (fresh?.role || savedUser.role);
+        const effectiveAssignedSubjects = isApprovedTeacher
+          ? (teacherApp?.approved_subject_ids || fresh?.assigned_subject_ids || savedUser.assigned_subject_ids || [])
+          : (fresh?.assigned_subject_ids || savedUser.assigned_subject_ids || []);
+
+        return {
+          ...savedUser,
+          role: effectiveRole,
+          display_name: fresh?.display_name || savedUser.display_name,
+          assigned_subject_ids: effectiveAssignedSubjects,
+          teacher_status: isApprovedTeacher ? 'approved' : (fresh?.teacher_status || savedUser.teacher_status),
+        };
       }
     }
   } catch (e) {
@@ -199,6 +213,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const checkRoleUpdates = async () => {
       if (!profile || profile.role === 'admin') return;
+
+      // Do not demote an approved teacher
+      const teacherApp = getTeacherApplicationByEmail(profile.email);
+      if (teacherApp && teacherApp.status === 'approved') {
+        if (profile.role !== 'teacher') {
+          const updatedProfile = {
+            ...profile,
+            role: 'teacher' as UserRole,
+            teacher_status: 'approved' as const,
+            assigned_subject_ids: teacherApp.approved_subject_ids || [],
+          };
+          setProfile(updatedProfile);
+          localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(updatedProfile));
+        }
+        return;
+      }
 
       // 1. Check local registered students
       const fresh = getRegisteredStudents().find((s) => s.id === profile.id);
@@ -371,33 +401,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // 4. Local Registered Students & Teachers Store
-      const student = findStudentByEmail(cleanEmail);
+      let student = findStudentByEmail(cleanEmail);
+
+      // If not found in primary store, check teacher application directly
+      if (!student) {
+        const teacherApp = getTeacherApplicationByEmail(cleanEmail);
+        if (teacherApp) {
+          const legacyUsers = typeof localStorage !== 'undefined'
+            ? JSON.parse(localStorage.getItem('studyhub_registered_students_v3') || '[]')
+            : [];
+          const legacyMatch = legacyUsers.find((u: any) => u.email && u.email.toLowerCase() === cleanEmail);
+          const candidatePassword = legacyMatch?.password || teacherApp.password;
+
+          const reconstructedTeacher = {
+            id: teacherApp.teacher_id || teacherApp.id,
+            display_name: teacherApp.display_name,
+            email: cleanEmail,
+            password: candidatePassword || '',
+            role: teacherApp.status === 'approved' ? ('teacher' as UserRole) : ('student' as UserRole),
+            gender: teacherApp.gender || ('male' as const),
+            phone: teacherApp.phone || '',
+            assigned_subject_ids: teacherApp.approved_subject_ids || [],
+            teacher_status: teacherApp.status,
+            created_at: teacherApp.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          upsertRegisteredStudentLocally(reconstructedTeacher);
+          student = reconstructedTeacher;
+        }
+      }
+
       if (student) {
         if (student.password && student.password !== password) {
           setIsLoading(false);
           return { error: 'Incorrect password. Please verify your password and try again.' };
         }
 
-        // Check if this is a pending teacher account
+        // Check if this is a pending or rejected teacher account
         const teacherApp = getTeacherApplicationByEmail(cleanEmail);
-        if (student.teacher_status === 'pending' || (teacherApp && teacherApp.status === 'pending')) {
+        const appStatus = teacherApp?.status || student.teacher_status;
+
+        if (appStatus === 'pending') {
           setIsLoading(false);
           return {
             error: 'Your teacher account is pending administrator review and approval. Please check back later or contact Muhammad Hammad.',
           };
         }
 
-        if (student.teacher_status === 'rejected' || (teacherApp && teacherApp.status === 'rejected')) {
+        if (appStatus === 'rejected') {
           setIsLoading(false);
           return {
             error: 'Your teacher account application was reviewed and not approved. Please contact the administrator for more information.',
           };
         }
 
+        const isApprovedTeacher = appStatus === 'approved' || student.role === 'teacher';
+        const approvedSubjects = teacherApp?.approved_subject_ids || student.assigned_subject_ids || [];
+
         const { password: _, ...safeProfile } = student;
-        if (teacherApp && teacherApp.status === 'approved') {
+        if (isApprovedTeacher) {
           safeProfile.role = 'teacher';
-          safeProfile.assigned_subject_ids = teacherApp.approved_subject_ids || [];
+          safeProfile.teacher_status = 'approved';
+          safeProfile.assigned_subject_ids = approvedSubjects;
+
+          // Crucial: ensure stored student record is elevated to teacher so role doesn't get demoted
+          upsertRegisteredStudentLocally({
+            ...student,
+            role: 'teacher',
+            teacher_status: 'approved',
+            assigned_subject_ids: approvedSubjects,
+          });
         }
 
         localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(safeProfile));
@@ -407,7 +480,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: safeProfile.id,
           email: safeProfile.email,
           app_metadata: {},
-          user_metadata: { display_name: safeProfile.display_name },
+          user_metadata: { display_name: safeProfile.display_name, role: safeProfile.role },
           aud: 'authenticated',
           created_at: safeProfile.created_at,
         } as User);
@@ -423,25 +496,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e: any) {
       console.warn('Authentication error:', e);
       // Attempt local fallback in case network or remote DB threw
-      const student = findStudentByEmail(cleanEmail);
+      let student = findStudentByEmail(cleanEmail);
+      const teacherApp = getTeacherApplicationByEmail(cleanEmail);
+
+      if (!student && teacherApp) {
+        const legacyUsers = typeof localStorage !== 'undefined'
+          ? JSON.parse(localStorage.getItem('studyhub_registered_students_v3') || '[]')
+          : [];
+        const legacyMatch = legacyUsers.find((u: any) => u.email && u.email.toLowerCase() === cleanEmail);
+        const candidatePassword = legacyMatch?.password || teacherApp.password;
+
+        student = {
+          id: teacherApp.teacher_id || teacherApp.id,
+          display_name: teacherApp.display_name,
+          email: cleanEmail,
+          password: candidatePassword || '',
+          role: teacherApp.status === 'approved' ? 'teacher' : 'student',
+          gender: teacherApp.gender || 'male',
+          phone: teacherApp.phone || '',
+          assigned_subject_ids: teacherApp.approved_subject_ids || [],
+          teacher_status: teacherApp.status,
+          created_at: teacherApp.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        upsertRegisteredStudentLocally(student);
+      }
+
       if (student) {
         if (student.password && student.password !== password) {
           setIsLoading(false);
           return { error: 'Incorrect password. Please verify your password and try again.' };
         }
 
-        const teacherApp = getTeacherApplicationByEmail(cleanEmail);
-        if (student.teacher_status === 'pending' || (teacherApp && teacherApp.status === 'pending')) {
+        const appStatus = teacherApp?.status || student.teacher_status;
+        if (appStatus === 'pending') {
           setIsLoading(false);
           return {
             error: 'Your teacher account is pending administrator review and approval. Please check back later or contact Muhammad Hammad.',
           };
         }
 
+        if (appStatus === 'rejected') {
+          setIsLoading(false);
+          return {
+            error: 'Your teacher account application was reviewed and not approved. Please contact the administrator for more information.',
+          };
+        }
+
+        const isApprovedTeacher = appStatus === 'approved' || student.role === 'teacher';
+        const approvedSubjects = teacherApp?.approved_subject_ids || student.assigned_subject_ids || [];
+
         const { password: _, ...safeProfile } = student;
-        if (teacherApp && teacherApp.status === 'approved') {
+        if (isApprovedTeacher) {
           safeProfile.role = 'teacher';
-          safeProfile.assigned_subject_ids = teacherApp.approved_subject_ids || [];
+          safeProfile.teacher_status = 'approved';
+          safeProfile.assigned_subject_ids = approvedSubjects;
+          upsertRegisteredStudentLocally({
+            ...student,
+            role: 'teacher',
+            teacher_status: 'approved',
+            assigned_subject_ids: approvedSubjects,
+          });
         }
 
         localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(safeProfile));
@@ -450,7 +565,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: safeProfile.id,
           email: safeProfile.email,
           app_metadata: {},
-          user_metadata: { display_name: safeProfile.display_name },
+          user_metadata: { display_name: safeProfile.display_name, role: safeProfile.role },
           aud: 'authenticated',
           created_at: safeProfile.created_at,
         } as User);

@@ -52,7 +52,7 @@ import { ResourceCard } from '../components/resource/ResourceCard';
 import { ContactAdminModal } from '../components/common/ContactAdminModal';
 
 export const StudentDashboardPage: React.FC = () => {
-  const { profile, signOut, isStudyManager, isAdmin, isCR, isGR } = useAuth();
+  const { profile, signOut, isStudyManager, isAdmin, isCR, isGR, isTeacher } = useAuth();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -183,6 +183,16 @@ export const StudentDashboardPage: React.FC = () => {
                   {roleBadge}
                 </span>
               </button>
+
+              {isTeacher && (
+                <Link
+                  to="/teacher"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-xs"
+                >
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>Teacher Portal</span>
+                </Link>
+              )}
 
               {isStudyManager && (
                 <Link

@@ -542,7 +542,54 @@ export interface RegisteredStudentEntry extends UserProfile {
 
 export function getRegisteredStudents(): RegisteredStudentEntry[] {
   const raw = getStoredOrInit<RegisteredStudentEntry[]>(STUDENTS_KEY, []);
-  return raw.filter((s) => !isTombstoned(s.id));
+  const list = raw.filter((s) => !isTombstoned(s.id));
+
+  // Auto-sync any teacher applications or legacy teacher accounts into the active directory
+  try {
+    const appsItem = typeof localStorage !== 'undefined' ? localStorage.getItem('studyhub_teacher_applications_v1') : null;
+    const legacyItem = typeof localStorage !== 'undefined' ? localStorage.getItem('studyhub_registered_students_v3') : null;
+    let mutated = false;
+
+    if (legacyItem) {
+      const legacyUsers = JSON.parse(legacyItem) as any[];
+      legacyUsers.forEach((lu) => {
+        if (!lu || !lu.email) return;
+        const exists = list.find((s) => s.email.toLowerCase() === lu.email.toLowerCase());
+        if (!exists) {
+          list.push(lu);
+          mutated = true;
+        }
+      });
+    }
+
+    if (appsItem) {
+      const apps = JSON.parse(appsItem) as any[];
+      apps.forEach((app) => {
+        if (!app || !app.email) return;
+        const studentIndex = list.findIndex((s) => s.email.toLowerCase() === app.email.toLowerCase());
+        if (studentIndex >= 0) {
+          const st = list[studentIndex];
+          if (app.status === 'approved' && st.role !== 'teacher') {
+            list[studentIndex] = {
+              ...st,
+              role: 'teacher',
+              teacher_status: 'approved',
+              assigned_subject_ids: app.approved_subject_ids || st.assigned_subject_ids || [],
+            };
+            mutated = true;
+          }
+        }
+      });
+    }
+
+    if (mutated && typeof localStorage !== 'undefined') {
+      localStorage.setItem(STUDENTS_KEY, JSON.stringify(list));
+    }
+  } catch {
+    // Non-blocking sync notice
+  }
+
+  return list;
 }
 
 export function registerStudent(input: StudentRegistrationInput): UserProfile {
@@ -598,9 +645,89 @@ export function deleteStudent(studentId: string): void {
   }
 }
 
+export function syncStudentWithTeacherApplication(student: RegisteredStudentEntry): RegisteredStudentEntry {
+  try {
+    if (typeof localStorage === 'undefined') return student;
+    const appsItem = localStorage.getItem('studyhub_teacher_applications_v1');
+    if (!appsItem) return student;
+    const apps = JSON.parse(appsItem) as any[];
+    const app = apps.find((a) => a.email && a.email.trim().toLowerCase() === student.email.trim().toLowerCase());
+    if (app) {
+      if (app.status === 'approved') {
+        student.role = 'teacher';
+        student.teacher_status = 'approved';
+        student.assigned_subject_ids = app.approved_subject_ids || [];
+      } else if (app.status === 'rejected') {
+        student.teacher_status = 'rejected';
+      } else if (app.status === 'pending') {
+        student.teacher_status = 'pending';
+      }
+      if (app.password && !student.password) {
+        student.password = app.password;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return student;
+}
+
 export function findStudentByEmail(email: string): RegisteredStudentEntry | undefined {
+  if (!email) return undefined;
+  const cleanEmail = email.trim().toLowerCase();
   const students = getRegisteredStudents();
-  return students.find((s) => s.email.toLowerCase() === email.trim().toLowerCase());
+  const found = students.find((s) => s.email.toLowerCase() === cleanEmail);
+  if (found) {
+    return syncStudentWithTeacherApplication(found);
+  }
+
+  // Also check legacy or alternate storage key 'studyhub_registered_students_v3'
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const legacyItem = localStorage.getItem('studyhub_registered_students_v3');
+      if (legacyItem) {
+        const legacyUsers = JSON.parse(legacyItem) as any[];
+        const match = legacyUsers.find(
+          (u) => u.email && u.email.trim().toLowerCase() === cleanEmail
+        );
+        if (match) {
+          const synced = syncStudentWithTeacherApplication(match);
+          upsertRegisteredStudentLocally(synced);
+          return synced;
+        }
+      }
+
+      // Check teacher applications
+      const appsItem = localStorage.getItem('studyhub_teacher_applications_v1');
+      if (appsItem) {
+        const apps = JSON.parse(appsItem) as any[];
+        const app = apps.find(
+          (a) => a.email && a.email.trim().toLowerCase() === cleanEmail
+        );
+        if (app) {
+          const reconstructed: RegisteredStudentEntry = {
+            id: app.teacher_id || app.id,
+            display_name: app.display_name,
+            email: app.email,
+            password: app.password || '',
+            role: app.status === 'approved' ? 'teacher' : 'student',
+            gender: app.gender || 'male',
+            phone: app.phone || '',
+            assigned_subject_ids: app.approved_subject_ids || [],
+            teacher_status: app.status,
+            created_at: app.created_at || new Date().toISOString(),
+            updated_at: app.updated_at || new Date().toISOString(),
+          };
+          upsertRegisteredStudentLocally(reconstructed);
+          return reconstructed;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Error finding student by email fallback:', e);
+  }
+
+  return undefined;
 }
 
 export function upsertRegisteredStudentLocally(entry: RegisteredStudentEntry): void {

@@ -24,7 +24,12 @@ import {
   UserProfile,
 } from '../types';
 import { supabase, isSupabaseConfigured } from './supabase';
-import { getDemoSubjects } from './demoStore';
+import {
+  getDemoSubjects,
+  findStudentByEmail,
+  upsertRegisteredStudentLocally,
+  RegisteredStudentEntry,
+} from './demoStore';
 
 // Storage Keys
 const TEACHER_APPLICATIONS_KEY = 'studyhub_teacher_applications_v1';
@@ -115,6 +120,7 @@ export async function submitTeacherRegistration(
       requested_subject_ids: input.requested_subject_ids || [],
       approved_subject_ids: [],
       status: 'pending',
+      password: input.password,
       created_at: now,
       updated_at: now,
     };
@@ -124,9 +130,8 @@ export async function submitTeacherRegistration(
     applications.unshift(application);
     setStored(TEACHER_APPLICATIONS_KEY, applications);
 
-    // Save pending teacher user credentials in user registry (password safely stored for local verification)
-    const storedUsers = getStored<any[]>('studyhub_registered_students_v3', []);
-    storedUsers.unshift({
+    // Save pending teacher user credentials in user registry (STUDENTS_KEY)
+    const teacherUserEntry: RegisteredStudentEntry = {
       id: teacherId,
       display_name: input.display_name.trim(),
       email: cleanEmail,
@@ -138,7 +143,12 @@ export async function submitTeacherRegistration(
       teacher_status: 'pending',
       created_at: now,
       updated_at: now,
-    });
+    };
+    upsertRegisteredStudentLocally(teacherUserEntry);
+
+    // Also persist in legacy key for backwards compatibility
+    const storedUsers = getStored<any[]>('studyhub_registered_students_v3', []);
+    storedUsers.unshift(teacherUserEntry);
     setStored('studyhub_registered_students_v3', storedUsers);
 
     // Remote sync with Supabase if configured
@@ -194,6 +204,23 @@ export async function approveTeacherApplication(
     setStored(TEACHER_APPLICATIONS_KEY, applications);
 
     // Upgrade teacher in user directory
+    const existingStudent = findStudentByEmail(app.email);
+    const updatedUserEntry: RegisteredStudentEntry = {
+      id: existingStudent?.id || app.teacher_id,
+      display_name: existingStudent?.display_name || app.display_name,
+      email: app.email,
+      password: existingStudent?.password || app.password || '',
+      role: 'teacher', // Elevated to Teacher
+      gender: existingStudent?.gender || app.gender || 'male',
+      phone: existingStudent?.phone || app.phone || '',
+      assigned_subject_ids: approvedSubjectIds,
+      teacher_status: 'approved',
+      created_at: existingStudent?.created_at || app.created_at,
+      updated_at: now,
+    };
+    upsertRegisteredStudentLocally(updatedUserEntry);
+
+    // Also upgrade in legacy key 'studyhub_registered_students_v3'
     const storedUsers = getStored<any[]>('studyhub_registered_students_v3', []);
     const userIndex = storedUsers.findIndex(
       (u) => u.id === app.teacher_id || u.email.toLowerCase() === app.email.toLowerCase()
@@ -201,13 +228,32 @@ export async function approveTeacherApplication(
     if (userIndex !== -1) {
       storedUsers[userIndex] = {
         ...storedUsers[userIndex],
-        role: 'teacher', // Elevated to Teacher
-        assigned_subject_ids: approvedSubjectIds,
-        teacher_status: 'approved',
-        updated_at: now,
+        ...updatedUserEntry,
       };
       setStored('studyhub_registered_students_v3', storedUsers);
+    } else {
+      storedUsers.unshift(updatedUserEntry);
+      setStored('studyhub_registered_students_v3', storedUsers);
     }
+
+    // If this teacher is currently signed in, immediately reflect approval in active profile
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const activeStr = localStorage.getItem('studyhub_active_user_v3');
+        if (activeStr) {
+          const active = JSON.parse(activeStr);
+          if (active.email && active.email.toLowerCase() === app.email.toLowerCase()) {
+            const updatedActive = {
+              ...active,
+              role: 'teacher',
+              assigned_subject_ids: approvedSubjectIds,
+              teacher_status: 'approved',
+            };
+            localStorage.setItem('studyhub_active_user_v3', JSON.stringify(updatedActive));
+          }
+        }
+      }
+    } catch {}
 
     // Remote sync
     if (isSupabaseConfigured) {
@@ -257,6 +303,16 @@ export async function rejectTeacherApplication(
     applications[appIndex] = app;
     setStored(TEACHER_APPLICATIONS_KEY, applications);
 
+    const existingStudent = findStudentByEmail(app.email);
+    if (existingStudent) {
+      upsertRegisteredStudentLocally({
+        ...existingStudent,
+        role: 'student',
+        teacher_status: 'rejected',
+        updated_at: now,
+      });
+    }
+
     const storedUsers = getStored<any[]>('studyhub_registered_students_v3', []);
     const userIndex = storedUsers.findIndex(
       (u) => u.id === app.teacher_id || u.email.toLowerCase() === app.email.toLowerCase()
@@ -272,6 +328,7 @@ export async function rejectTeacherApplication(
     }
 
     dispatchCustomEvent('studyhub_teacher_applications_updated');
+    dispatchCustomEvent('studyhub_students_updated');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Failed to reject application.' };
@@ -289,7 +346,7 @@ export function getTeacherAssignedSubjects(teacher: UserProfile | null): Subject
   // Look in user profile assigned_subject_ids, or application approved_subject_ids
   let subjectIds = teacher.assigned_subject_ids || [];
   if (subjectIds.length === 0) {
-    const app = getTeacherApplicationById(teacher.id);
+    const app = getTeacherApplicationById(teacher.id) || getTeacherApplicationByEmail(teacher.email);
     if (app?.status === 'approved') {
       subjectIds = app.approved_subject_ids || [];
     }

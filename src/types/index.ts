@@ -70,6 +70,7 @@ export interface TeacherApplication {
   status: 'pending' | 'approved' | 'rejected';
   rejection_reason?: string;
   reviewed_by?: string;
+  password?: string;
   created_at: string;
   updated_at: string;
 }

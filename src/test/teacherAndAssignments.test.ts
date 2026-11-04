@@ -14,6 +14,7 @@ import {
   parseQuestionsCsv,
 } from '../lib/teacherAssignmentStore';
 import { TeacherRegistrationInput } from '../types';
+import { findStudentByEmail } from '../lib/demoStore';
 
 describe('Hammad StudyHub — Teacher Portal & Student Assignment Submissions', () => {
   beforeEach(() => {
@@ -74,6 +75,13 @@ describe('Hammad StudyHub — Teacher Portal & Student Assignment Submissions', 
       const updated = applications.find((a) => a.id === appId);
       expect(updated?.status).toBe('approved');
       expect(updated?.approved_subject_ids).toEqual(['sub-dld-01']);
+
+      // Ensure teacher account in user store is upgraded to teacher role
+      const teacherUser = findStudentByEmail('zulfiqar@studyhub.edu');
+      expect(teacherUser).toBeDefined();
+      expect(teacherUser?.role).toBe('teacher');
+      expect(teacherUser?.teacher_status).toBe('approved');
+      expect(teacherUser?.assigned_subject_ids).toEqual(['sub-dld-01']);
     });
 
     it('allows Admin to reject application with optional reason', async () => {
@@ -90,6 +98,31 @@ describe('Hammad StudyHub — Teacher Portal & Student Assignment Submissions', 
       const applications = getTeacherApplications();
       expect(applications[0].status).toBe('rejected');
       expect(applications[0].rejection_reason).toBe('Incomplete credentials');
+    });
+
+    it('migrates legacy teacher account from studyhub_registered_students_v3 into active directory on lookup', () => {
+      // Simulate account registered previously in studyhub_registered_students_v3
+      localStorage.setItem('studyhub_registered_students_v3', JSON.stringify([
+        {
+          id: 'teacher-legacy-1',
+          display_name: 'Sir Farhan',
+          email: 'farhan@studyhub.edu',
+          password: 'SecretPassword!',
+          role: 'teacher',
+          assigned_subject_ids: ['sub-dld-01'],
+          teacher_status: 'approved',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      ]));
+
+      // Verify findStudentByEmail seamlessly finds and migrates the account
+      const found = findStudentByEmail('farhan@studyhub.edu');
+      expect(found).toBeDefined();
+      expect(found?.role).toBe('teacher');
+      expect(found?.teacher_status).toBe('approved');
+      expect(found?.password).toBe('SecretPassword!');
+      expect(found?.assigned_subject_ids).toEqual(['sub-dld-01']);
     });
   });
 
