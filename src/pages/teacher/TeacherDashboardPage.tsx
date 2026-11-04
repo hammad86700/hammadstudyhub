@@ -43,6 +43,8 @@ import {
   Sparkles,
   Maximize2,
   Trash2,
+  ShieldAlert,
+  BarChart2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSubjects } from '../../hooks/useSubjects';
@@ -79,6 +81,8 @@ import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { EmptyState } from '../../components/common/EmptyState';
 import { formatLessonDate, formatRelativeTime } from '../../lib/utils';
+import { TeacherReportsInbox } from '../../components/anonymous/TeacherReportsInbox';
+import { TeacherQuestionsSection } from '../../components/anonymous/TeacherQuestionsSection';
 
 export const TeacherDashboardPage: React.FC = () => {
   const { profile, isTeacher, isAdmin } = useAuth();
@@ -87,7 +91,7 @@ export const TeacherDashboardPage: React.FC = () => {
   const { createResource } = useResourceMutations();
 
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'submissions' | 'tests' | 'questions' | 'upload'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'submissions' | 'tests' | 'questions' | 'upload' | 'reports' | 'polls'>('overview');
 
   // Teacher Assigned Subjects (Strict isolation)
   const assignedSubjects = useMemo(() => {
@@ -549,6 +553,8 @@ export const TeacherDashboardPage: React.FC = () => {
           { id: 'tests', label: 'Tests & Quizzes', icon: Clock },
           { id: 'questions', label: 'Question Bank', icon: HelpCircle },
           { id: 'upload', label: 'Upload Materials', icon: Upload },
+          { id: 'reports', label: 'Reports Inbox', icon: ShieldAlert },
+          { id: 'polls', label: 'Anonymous Questions & Polls', icon: BarChart2 },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -1070,6 +1076,24 @@ export const TeacherDashboardPage: React.FC = () => {
               </Button>
             </form>
           </Card>
+        </section>
+      )}
+
+      {/* ------------------------------------------------------------------- */}
+      {/* TAB 6: ANONYMOUS REPORTS INBOX                                     */}
+      {/* ------------------------------------------------------------------- */}
+      {activeTab === 'reports' && (
+        <section className="space-y-6">
+          <TeacherReportsInbox />
+        </section>
+      )}
+
+      {/* ------------------------------------------------------------------- */}
+      {/* TAB 7: ANONYMOUS QUESTIONS & POLLS                                 */}
+      {/* ------------------------------------------------------------------- */}
+      {activeTab === 'polls' && (
+        <section className="space-y-6">
+          <TeacherQuestionsSection />
         </section>
       )}
 

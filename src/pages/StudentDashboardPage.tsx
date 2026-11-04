@@ -28,6 +28,8 @@ import {
   ChevronRight,
   GraduationCap,
   ClipboardCheck,
+  ShieldAlert,
+  FileQuestion,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSubjects } from '../hooks/useSubjects';
@@ -40,6 +42,8 @@ import {
   getUnreadNotificationCount,
 } from '../lib/notifications';
 import { StudentAssignmentsList } from '../components/assignment/StudentAssignmentsList';
+import { StudentReportsSection } from '../components/anonymous/StudentReportsSection';
+import { StudentQuestionsSection } from '../components/anonymous/StudentQuestionsSection';
 import { SEOHead } from '../components/common/SEOHead';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
@@ -54,7 +58,7 @@ export const StudentDashboardPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'materials' | 'assignments'>('materials');
+  const [activeTab, setActiveTab] = useState<'materials' | 'assignments' | 'reports' | 'polls'>('materials');
 
   // Live Database Queries
   const { data: subjects = [], isLoading: subjectsLoading } = useSubjects();
@@ -261,12 +265,12 @@ export const StudentDashboardPage: React.FC = () => {
           </aside>
         )}
 
-        {/* Navigation Mode Switcher: Study Materials vs Assignment Submissions */}
-        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 w-fit">
+        {/* Navigation Mode Switcher: Study Materials vs Assignment Submissions vs Anonymous Reports vs Questions */}
+        <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 w-full overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('materials')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'materials'
                 ? 'bg-white dark:bg-navy-900 text-brand-600 dark:text-brand-400 shadow-subtle'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -282,19 +286,49 @@ export const StudentDashboardPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('assignments')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'assignments'
                 ? 'bg-white dark:bg-navy-900 text-brand-600 dark:text-brand-400 shadow-subtle'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <ClipboardCheck className="w-4 h-4" />
-            <span>My Assignment Submissions</span>
+            <span>My Assignments</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('reports')}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'reports'
+                ? 'bg-white dark:bg-navy-900 text-brand-600 dark:text-brand-400 shadow-subtle'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4" />
+            <span>Anonymous Reports</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('polls')}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'polls'
+                ? 'bg-white dark:bg-navy-900 text-brand-600 dark:text-brand-400 shadow-subtle'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <FileQuestion className="w-4 h-4" />
+            <span>Teacher Polls & Questions</span>
           </button>
         </div>
 
         {activeTab === 'assignments' ? (
           <StudentAssignmentsList />
+        ) : activeTab === 'reports' ? (
+          <StudentReportsSection />
+        ) : activeTab === 'polls' ? (
+          <StudentQuestionsSection />
         ) : (
           <>
             {/* 3. YOUR SUBJECTS — THE PRIMARY FOCUS OF THE PLATFORM */}

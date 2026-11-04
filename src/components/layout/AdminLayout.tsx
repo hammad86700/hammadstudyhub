@@ -20,6 +20,7 @@ import {
   Sun,
   Moon,
   ShieldCheck,
+  ShieldAlert,
   Crown,
   Award,
   Database,
@@ -76,6 +77,7 @@ export const AdminLayout: React.FC = () => {
     { label: 'Announcements', href: '/admin/announcements', icon: Bell },
     ...(isAdmin
       ? [
+          { label: 'Report Moderation', href: '/admin/reports', icon: ShieldAlert },
           { label: 'Teacher Applications', href: '/admin/teachers', icon: Award },
           { label: 'Student Directory & CR/GR', href: '/admin/students', icon: Users },
           { label: 'Platform & Social Settings', href: '/admin/settings', icon: Settings },

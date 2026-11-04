@@ -41,6 +41,7 @@ import { AdminResourcesPage } from './pages/admin/AdminResourcesPage';
 import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
 import { AdminStudentsPage } from './pages/admin/AdminStudentsPage';
 import { AdminTeachersPage } from './pages/admin/AdminTeachersPage';
+import { AdminReportsPage } from './pages/admin/AdminReportsPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { TeacherDashboardPage } from './pages/teacher/TeacherDashboardPage';
 import { initRealtimeSync } from './lib/realtimeSync';
@@ -205,6 +206,7 @@ export const App: React.FC = () => {
                 <Route path="announcements" element={<AdminAnnouncementsPage />} />
                 <Route path="students" element={<AdminStudentsPage />} />
                 <Route path="teachers" element={<AdminTeachersPage />} />
+                <Route path="reports" element={<AdminReportsPage />} />
                 <Route path="settings" element={<AdminSettingsPage />} />
               </Route>
             </Routes>
