@@ -12,6 +12,7 @@ import {
   mergeAnnouncementsLocally,
 } from '../lib/demoStore';
 import { broadcastDataChange } from '../lib/realtimeSync';
+import { notifyAnnouncementPublished } from '../lib/notifications';
 
 export function useAnnouncements(options: { includeDrafts?: boolean } = {}) {
   const includeDrafts = Boolean(options.includeDrafts);
@@ -89,6 +90,14 @@ export function useAnnouncementMutations() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['announcements'] });
       broadcastDataChange('announcements', 'create', data);
+      if (data && data.status === 'published') {
+        notifyAnnouncementPublished({
+          id: data.id,
+          title: data.title,
+          body: data.body,
+          is_pinned: data.is_pinned,
+        });
+      }
     },
   });
 

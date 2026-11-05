@@ -51,6 +51,13 @@ export type {
   UserProfile,
 };
 import { supabase, isSupabaseConfigured } from './supabase';
+import {
+  notifyPollPublished,
+  notifyAnonymousReportSubmitted,
+  notifyAnonymousReportPublished,
+  notifyPollResponseReceived,
+} from './notifications';
+import { validateTeacherSubjectAccess } from './teacherAssignmentStore';
 
 // Local Storage Keys
 const REPORTS_KEY = 'studyhub_anonymous_reports_v1';
@@ -230,6 +237,9 @@ export async function submitAnonymousReport(
       }
     }
 
+    // Dispatch persistent notifications based on audience (ZERO student identity)
+    notifyAnonymousReportSubmitted(report);
+
     dispatchCustomEvent('studyhub_reports_updated');
     return { success: true, report, reference_number: referenceNumber };
   } catch (err: any) {
@@ -386,6 +396,10 @@ export async function moderateReport(
       }
     }
 
+    if (action === 'publish') {
+      notifyAnonymousReportPublished(report);
+    }
+
     dispatchCustomEvent('studyhub_reports_updated');
     return { success: true };
   } catch (err: any) {
@@ -476,9 +490,17 @@ export interface CreateQuestionInput {
  * Creates a new teacher question, poll, or anonymous feedback prompt.
  */
 export async function createAnonymousQuestion(
-  input: CreateQuestionInput
+  input: CreateQuestionInput,
+  teacherProfile?: UserProfile | null
 ): Promise<{ success: boolean; question?: AnonymousQuestion; error?: string }> {
   try {
+    if (teacherProfile && !validateTeacherSubjectAccess(teacherProfile, input.subject_id)) {
+      return {
+        success: false,
+        error: `Access Denied: You are not authorized to create questions for subject ID "${input.subject_id}".`,
+      };
+    }
+
     if (!input.title || !input.title.trim()) {
       return { success: false, error: 'Question title is required.' };
     }
@@ -553,6 +575,17 @@ export async function createAnonymousQuestion(
       } catch (sErr) {
         console.warn('[StudyHub Anonymous] Supabase question insert notice:', sErr);
       }
+    }
+
+    // Notify students of this subject that a new anonymous question/poll was published
+    if (question.status === 'active') {
+      notifyPollPublished({
+        id: question.id,
+        title: question.title,
+        subject_id: question.subject_id,
+        subject_name: question.subject_name,
+        closing_date: question.closing_date,
+      });
     }
 
     dispatchCustomEvent('studyhub_polls_updated');
@@ -712,6 +745,17 @@ export async function submitAnonymousResponse(
       } catch (sErr) {
         console.warn('[StudyHub Anonymous] Supabase response insert notice:', sErr);
       }
+    }
+
+    // Notify the teacher author that an anonymous response was received (ZERO student identity)
+    if (question.teacher_id) {
+      notifyPollResponseReceived(question.id, question.teacher_id, question.title);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('studyhub_poll_response_received', { detail: { questionId: question.id } })
+      );
     }
 
     dispatchCustomEvent('studyhub_polls_updated');

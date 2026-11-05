@@ -40,7 +40,9 @@ import { formatLessonDate, formatRelativeTime } from '../lib/utils';
 import {
   getStudentNotifications,
   getUnreadNotificationCount,
+  getDashboardUpdatesForStudent,
 } from '../lib/notifications';
+import { DashboardUpdateItem } from '../types';
 import { StudentAssignmentsList } from '../components/assignment/StudentAssignmentsList';
 import { StudentReportsSection } from '../components/anonymous/StudentReportsSection';
 import { StudentQuestionsSection } from '../components/anonymous/StudentQuestionsSection';
@@ -115,6 +117,32 @@ export const StudentDashboardPage: React.FC = () => {
   const pinnedAnnouncement = useMemo(() => {
     return announcements.find((a) => a.is_pinned && a.status === 'published') || announcements[0];
   }, [announcements]);
+
+  // What's New For You (Aggregated live tests, polls, materials, and notices)
+  const [dashboardUpdates, setDashboardUpdates] = useState<DashboardUpdateItem[]>(() =>
+    getDashboardUpdatesForStudent(profile)
+  );
+
+  const refreshUpdates = () => {
+    setDashboardUpdates(getDashboardUpdatesForStudent(profile));
+  };
+
+  React.useEffect(() => {
+    refreshUpdates();
+    window.addEventListener('studyhub_teacher_tests_updated', refreshUpdates);
+    window.addEventListener('studyhub_polls_updated', refreshUpdates);
+    window.addEventListener('studyhub_resources_updated', refreshUpdates);
+    window.addEventListener('studyhub_announcements_updated', refreshUpdates);
+    window.addEventListener('studyhub_notifications_updated', refreshUpdates);
+
+    return () => {
+      window.removeEventListener('studyhub_teacher_tests_updated', refreshUpdates);
+      window.removeEventListener('studyhub_polls_updated', refreshUpdates);
+      window.removeEventListener('studyhub_resources_updated', refreshUpdates);
+      window.removeEventListener('studyhub_announcements_updated', refreshUpdates);
+      window.removeEventListener('studyhub_notifications_updated', refreshUpdates);
+    };
+  }, [profile, resources, announcements]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -273,6 +301,81 @@ export const StudentDashboardPage: React.FC = () => {
               All Announcements &rarr;
             </Link>
           </aside>
+        )}
+
+        {/* 1.5. WHAT'S NEW FOR YOU (Live Priority Activities) */}
+        {dashboardUpdates.length > 0 && (
+          <section className="space-y-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                  What's New for You
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+                  {dashboardUpdates.length} Updates
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">
+                Live assessments, feedback polls & study updates
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {dashboardUpdates.map((item) => (
+                <div
+                  key={item.id}
+                  className="group relative p-4 rounded-2xl bg-white dark:bg-navy-900 border border-slate-200/90 dark:border-slate-800 shadow-subtle hover:border-brand-300 dark:hover:border-brand-700 transition-all flex flex-col justify-between space-y-3"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                          item.type === 'test'
+                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
+                            : item.type === 'poll'
+                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                            : item.type === 'announcement'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                        }`}
+                      >
+                        {item.status_badge}
+                      </span>
+                      <span className="text-[10px] text-slate-400 shrink-0">
+                        {formatRelativeTime(item.timestamp)}
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        {item.subject_name}
+                      </p>
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white line-clamp-2 mt-0.5 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                        {item.title}
+                      </h3>
+                    </div>
+
+                    {item.meta_info && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                        {item.meta_info}
+                      </p>
+                    )}
+                  </div>
+
+                  <Link
+                    to={item.action_url}
+                    className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-50 hover:bg-brand-50 hover:text-brand-700 dark:bg-navy-950 dark:hover:bg-brand-950/80 dark:hover:text-brand-300 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 transition-all cursor-pointer"
+                  >
+                    <span>{item.action_label}</span>
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* Navigation Mode Switcher: Study Materials vs Assignment Submissions vs Anonymous Reports vs Questions */}

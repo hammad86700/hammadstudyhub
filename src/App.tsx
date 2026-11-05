@@ -65,7 +65,7 @@ const queryClient = new QueryClient({
  * - If user is not logged in -> displays the Public Website (clean platform introduction & features)
  */
 const RootRoute: React.FC = () => {
-  const { isLoggedIn, isLoading } = useAuth();
+  const { isLoggedIn, isLoading, isTeacher, isStudyManager } = useAuth();
 
   if (isLoading) {
     return (
@@ -76,6 +76,12 @@ const RootRoute: React.FC = () => {
   }
 
   if (isLoggedIn) {
+    if (isTeacher) {
+      return <Navigate to="/teacher" replace />;
+    }
+    if (isStudyManager) {
+      return <Navigate to="/admin" replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 

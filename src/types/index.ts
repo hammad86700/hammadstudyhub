@@ -502,3 +502,56 @@ export interface QuestionResponseSummary {
   shuffled_text_responses?: string[];
 }
 
+// ==============================================================================
+// REAL-TIME PERSISTENT NOTIFICATION ENGINE TYPES
+// ==============================================================================
+
+export type NotificationType =
+  | 'test_published'
+  | 'poll_published'
+  | 'material_uploaded'
+  | 'announcement'
+  | 'assignment_created'
+  | 'test_schedule_updated'
+  | 'report_submitted'
+  | 'report_published'
+  | 'assignment_submitted'
+  | 'poll_response_received';
+
+export interface PersistentNotification {
+  id: string;
+  recipient_type: 'user' | 'role' | 'subject_students' | 'subject_teachers' | 'all';
+  recipient_id?: string; // user ID, role string ('admin', 'teacher'), or subject ID
+  actor_id?: string;
+  actor_name?: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  subject_id?: string;
+  subject_name?: string;
+  target_url: string;
+  entity_id?: string;
+  priority?: boolean;
+  badge_label?: string;
+  is_read?: boolean;
+  is_anonymous?: boolean;
+  read_by?: string[]; // IDs of users who marked this notification read
+  created_at: string;
+}
+
+export interface DashboardUpdateItem {
+  id: string;
+  type: 'test' | 'poll' | 'material' | 'announcement' | 'assignment';
+  title: string;
+  subject_id?: string;
+  subject_name: string;
+  timestamp: string;
+  status_badge: string; // e.g. "NEW — DLD"
+  type_label: string; // e.g. "Practice Test", "Anonymous Poll", "Lecture Notes"
+  action_label: string; // e.g. "Open Test", "Respond", "Open Material"
+  action_url: string;
+  is_urgent?: boolean;
+  meta_info?: string; // e.g. "Closes tomorrow", "Uploaded recently"
+}
+
+

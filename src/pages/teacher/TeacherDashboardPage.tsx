@@ -83,6 +83,12 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { formatLessonDate, formatRelativeTime } from '../../lib/utils';
 import { TeacherReportsInbox } from '../../components/anonymous/TeacherReportsInbox';
 import { TeacherQuestionsSection } from '../../components/anonymous/TeacherQuestionsSection';
+import {
+  getNotificationsForUser,
+  markPersistentNotificationRead,
+  markAllPersistentNotificationsRead,
+} from '../../lib/notifications';
+import { PersistentNotification } from '../../types';
 
 export const TeacherDashboardPage: React.FC = () => {
   const { profile, isTeacher, isAdmin } = useAuth();
@@ -119,9 +125,12 @@ export const TeacherDashboardPage: React.FC = () => {
   // Notifications state
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<TeacherNotification[]>([]);
+  const [persistentNotifs, setPersistentNotifs] = useState<PersistentNotification[]>([]);
   const unreadNotifCount = useMemo(() => {
-    return profile ? getTeacherUnreadNotificationCount(profile.id) : 0;
-  }, [profile, notifications]);
+    const pUnread = persistentNotifs.filter((n) => !n.is_read).length;
+    const tUnread = profile ? getTeacherUnreadNotificationCount(profile.id) : 0;
+    return Math.max(pUnread, tUnread);
+  }, [profile, persistentNotifs, notifications]);
 
   // Tests & Question Bank state
   const [tests, setTests] = useState<TeacherTest[]>([]);
@@ -163,7 +172,8 @@ export const TeacherDashboardPage: React.FC = () => {
     const subs = getTeacherSubmissions(assignedSubjectIds);
     setSubmissions(subs);
     setNotifications(getTeacherNotifications(profile.id));
-    setTests(getTeacherTests(profile.id));
+    setPersistentNotifs(getNotificationsForUser(profile));
+    setTests(getTeacherTests(profile.id, undefined, profile));
     setQuestions(getQuestionBank());
   };
 
@@ -171,12 +181,14 @@ export const TeacherDashboardPage: React.FC = () => {
     refreshAllData();
     window.addEventListener('studyhub_assignment_submissions_updated', refreshAllData);
     window.addEventListener('studyhub_teacher_notifications_updated', refreshAllData);
+    window.addEventListener('studyhub_notifications_updated', refreshAllData);
     window.addEventListener('studyhub_teacher_tests_updated', refreshAllData);
     window.addEventListener('studyhub_question_bank_updated', refreshAllData);
 
     return () => {
       window.removeEventListener('studyhub_assignment_submissions_updated', refreshAllData);
       window.removeEventListener('studyhub_teacher_notifications_updated', refreshAllData);
+      window.removeEventListener('studyhub_notifications_updated', refreshAllData);
       window.removeEventListener('studyhub_teacher_tests_updated', refreshAllData);
       window.removeEventListener('studyhub_question_bank_updated', refreshAllData);
     };
@@ -273,6 +285,10 @@ export const TeacherDashboardPage: React.FC = () => {
       alert('Please select an assigned subject.');
       return;
     }
+    if (assignedSubjects.length === 0 || !assignedSubjectIds.includes(newTest.subject_id)) {
+      alert('Access Denied: You are not authorized to create or schedule tests for this subject.');
+      return;
+    }
 
     const testId = `test-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const fullTest: TeacherTest = {
@@ -295,7 +311,7 @@ export const TeacherDashboardPage: React.FC = () => {
       updated_at: new Date().toISOString(),
     };
 
-    saveTeacherTest(fullTest);
+    saveTeacherTest(fullTest, profile);
     setTestModalOpen(false);
     setNewTest({
       title: '',
@@ -332,8 +348,12 @@ export const TeacherDashboardPage: React.FC = () => {
 
   const handleCommitImportQuestions = () => {
     if (importParsedQuestions.length === 0) return;
+    if (assignedSubjects.length === 0 || !assignedSubjectIds.includes(importSubjectId)) {
+      alert('Access Denied: You are not authorized to import questions for this subject.');
+      return;
+    }
     importParsedQuestions.forEach((q) => {
-      saveQuestionBankItem(q);
+      saveQuestionBankItem(q, profile);
     });
     setImportSuccess(`Successfully imported ${importParsedQuestions.length} questions into Question Bank!`);
     setImportParsedQuestions([]);
@@ -367,6 +387,10 @@ export const TeacherDashboardPage: React.FC = () => {
     }
     if (!uploadSubjectId) {
       alert('Please select an assigned subject.');
+      return;
+    }
+    if (assignedSubjects.length === 0 || !assignedSubjectIds.includes(uploadSubjectId)) {
+      alert('Access Denied: You are not authorized to upload learning materials for this subject.');
       return;
     }
     if (!uploadFile) {
@@ -455,7 +479,13 @@ export const TeacherDashboardPage: React.FC = () => {
                   </div>
                   {unreadNotifCount > 0 && (
                     <button
-                      onClick={() => profile && markAllTeacherNotificationsRead(profile.id)}
+                      onClick={() => {
+                        if (profile) {
+                          markAllTeacherNotificationsRead(profile.id);
+                          markAllPersistentNotificationsRead(profile.id, persistentNotifs);
+                          refreshAllData();
+                        }
+                      }}
                       className="text-[11px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
                     >
                       Mark all as read
@@ -464,36 +494,70 @@ export const TeacherDashboardPage: React.FC = () => {
                 </div>
 
                 <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {notifications.length === 0 ? (
+                  {persistentNotifs.length === 0 && notifications.length === 0 ? (
                     <div className="p-6 text-center text-xs text-slate-400">
-                      No notifications yet. You will be alerted whenever a student submits an assignment.
+                      No notifications yet. You will be alerted whenever a student submits an assignment or report.
                     </div>
                   ) : (
-                    notifications.map((n) => (
-                      <div
-                        key={n.id}
-                        onClick={() => {
-                          markTeacherNotificationRead(n.id);
-                          setActiveTab('submissions');
-                          setNotificationsOpen(false);
-                        }}
-                        className={`p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer space-y-1 ${
-                          !n.read ? 'bg-brand-50/40 dark:bg-brand-950/30' : ''
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
-                            {n.student_name} ({n.roll_no})
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {formatRelativeTime(n.submission_time)}
-                          </span>
+                    <>
+                      {persistentNotifs.map((pn) => (
+                        <div
+                          key={pn.id}
+                          onClick={() => {
+                            if (profile) markPersistentNotificationRead(pn.id, profile.id);
+                            if (pn.target_url.includes('tab=')) {
+                              const tab = pn.target_url.split('tab=')[1] as any;
+                              if (tab) setActiveTab(tab);
+                            } else {
+                              navigate(pn.target_url);
+                            }
+                            setNotificationsOpen(false);
+                            refreshAllData();
+                          }}
+                          className={`p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer space-y-1 ${
+                            !pn.is_read ? 'bg-brand-50/40 dark:bg-brand-950/30' : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+                              {pn.title}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {formatRelativeTime(pn.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 font-medium line-clamp-1">
+                            {pn.message}
+                          </p>
                         </div>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium line-clamp-1">
-                          Submitted "{n.assignment_title}" in {n.subject_name}
-                        </p>
-                      </div>
-                    ))
+                      ))}
+                      {notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => {
+                            markTeacherNotificationRead(n.id);
+                            setActiveTab('submissions');
+                            setNotificationsOpen(false);
+                            refreshAllData();
+                          }}
+                          className={`p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer space-y-1 ${
+                            !n.read ? 'bg-brand-50/40 dark:bg-brand-950/30' : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+                              {n.student_name} ({n.roll_no})
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {formatRelativeTime(n.submission_time)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 font-medium line-clamp-1">
+                            Submitted "{n.assignment_title}" in {n.subject_name}
+                          </p>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
               </div>
@@ -511,6 +575,57 @@ export const TeacherDashboardPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* 0 Assigned Subjects Alert Notice */}
+      {assignedSubjects.length === 0 && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 flex items-start gap-4 shadow-subtle">
+          <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+              No Subjects Assigned to Your Account Yet
+            </h3>
+            <p className="text-xs text-amber-700 dark:text-amber-300/90 leading-relaxed">
+              No subjects have been assigned to your account yet. Please contact the administrator (Muhammad Hammad) to assign your teaching subjects. You cannot create tests, upload materials, or view submissions until subjects are assigned.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Teaching Subjects Quick Filter (When multiple subjects are assigned) */}
+      {assignedSubjects.length > 1 && (
+        <div className="flex items-center gap-2 p-2 rounded-2xl bg-slate-100/80 dark:bg-navy-950 border border-slate-200/80 dark:border-slate-800 overflow-x-auto no-scrollbar">
+          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 px-2 shrink-0">
+            Teaching Subjects:
+          </span>
+          <button
+            type="button"
+            onClick={() => setSubmissionSubjectFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+              submissionSubjectFilter === 'all'
+                ? 'bg-brand-600 text-white shadow-xs'
+                : 'bg-white dark:bg-navy-900 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            All Assigned ({assignedSubjects.length})
+          </button>
+          {assignedSubjects.map((sub) => (
+            <button
+              key={sub.id}
+              type="button"
+              onClick={() => setSubmissionSubjectFilter(sub.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                submissionSubjectFilter === sub.id
+                  ? 'bg-brand-600 text-white shadow-xs'
+                  : 'bg-white dark:bg-navy-900 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              {sub.code || sub.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Metric Summary Counters */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
@@ -993,17 +1108,23 @@ export const TeacherDashboardPage: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Assigned Subject <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={uploadSubjectId}
-                  onChange={(e) => setUploadSubjectId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-navy-950 text-slate-900 dark:text-white font-medium"
-                >
-                  {assignedSubjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
+                {assignedSubjects.length === 0 ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200">
+                    No subjects have been assigned to your account yet. Please contact the administrator.
+                  </p>
+                ) : (
+                  <select
+                    value={uploadSubjectId}
+                    onChange={(e) => setUploadSubjectId(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-navy-950 text-slate-900 dark:text-white font-medium"
+                  >
+                    {assignedSubjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Title */}
@@ -1071,6 +1192,7 @@ export const TeacherDashboardPage: React.FC = () => {
                 variant="primary"
                 className="w-full font-bold mt-2"
                 isLoading={isUploadingMaterial}
+                disabled={isUploadingMaterial || assignedSubjects.length === 0}
               >
                 Publish to Student Portal
               </Button>
@@ -1389,17 +1511,23 @@ export const TeacherDashboardPage: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                   Subject <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={newTest.subject_id}
-                  onChange={(e) => setNewTest({ ...newTest, subject_id: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-navy-950 text-slate-900 dark:text-white"
-                >
-                  {assignedSubjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
+                {assignedSubjects.length === 0 ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200">
+                    No subjects assigned to your account yet. Contact Admin.
+                  </p>
+                ) : (
+                  <select
+                    value={newTest.subject_id}
+                    onChange={(e) => setNewTest({ ...newTest, subject_id: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-navy-950 text-slate-900 dark:text-white"
+                  >
+                    {assignedSubjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1482,7 +1610,13 @@ export const TeacherDashboardPage: React.FC = () => {
               <Button size="sm" variant="outline" onClick={() => setTestModalOpen(false)}>
                 Cancel
               </Button>
-              <Button size="sm" variant="primary" className="font-bold" onClick={handleSaveTest}>
+              <Button
+                size="sm"
+                variant="primary"
+                className="font-bold"
+                disabled={assignedSubjects.length === 0}
+                onClick={handleSaveTest}
+              >
                 Save Test Assessment
               </Button>
             </div>

@@ -16,6 +16,7 @@ import {
 import { resolveEmbedUrl, detectSourceProvider } from '../lib/googleDrive';
 import { slugify } from '../lib/utils';
 import { broadcastDataChange } from '../lib/realtimeSync';
+import { notifyMaterialUploaded } from '../lib/notifications';
 
 export function useResources(
   subjectIdOrSlug?: string,
@@ -350,6 +351,18 @@ export function useResourceMutations() {
 
       // 1. ALWAYS save to local store & IndexedDB first
       saveDemoResource(newRes);
+
+      // Trigger notification for enrolled/subject students
+      if (newRes.status === 'published') {
+        notifyMaterialUploaded({
+          id: newRes.id,
+          title: newRes.title,
+          subject_id: newRes.subject_id,
+          file_name: newRes.file_name,
+          resource_type: newRes.resource_type,
+          slug: newRes.slug,
+        });
+      }
 
       // 2. If Supabase configured, attempt remote sync
       if (isSupabaseConfigured) {

@@ -30,6 +30,11 @@ import {
   upsertRegisteredStudentLocally,
   RegisteredStudentEntry,
 } from './demoStore';
+import {
+  notifyTestPublished,
+  notifyTestScheduleUpdated,
+  notifyAssignmentSubmitted,
+} from './notifications';
 
 // Storage Keys
 const TEACHER_APPLICATIONS_KEY = 'studyhub_teacher_applications_v1';
@@ -439,6 +444,16 @@ export async function createAssignmentSubmission(
     // Identify teachers assigned to this subject & generate notifications
     createNotificationsForSubjectTeachers(submission);
 
+    // Also trigger central persistent notification for assigned subject teachers
+    notifyAssignmentSubmitted({
+      id: submission.id,
+      student_name: submission.student_name,
+      roll_no: submission.roll_no,
+      subject_id: submission.subject_id,
+      subject_name: submission.subject_name,
+      assignment_title: submission.title,
+    });
+
     // Dual-write to Supabase if configured
     if (isSupabaseConfigured) {
       try {
@@ -596,16 +611,53 @@ function createNotificationsForSubjectTeachers(submission: StudentAssignmentSubm
 // 4. TESTS, QUIZZES & QUESTION BANK
 // -----------------------------------------------------------------------------
 
-export function getTeacherTests(teacherId?: string, subjectId?: string): TeacherTest[] {
+/**
+ * Strict Subject Permission Guard:
+ * Verifies whether the teacher or user is authorized to view, manage, or publish for a given subject.
+ * - Platform Admins / CR / GR: Full access across all subjects.
+ * - Teachers: Authorized ONLY for subjects explicitly in their assigned_subject_ids.
+ * - Other users: Denied.
+ */
+export function validateTeacherSubjectAccess(
+  teacher: UserProfile | null | { role?: string; assigned_subject_ids?: string[] },
+  subjectId: string
+): boolean {
+  if (!teacher || !subjectId) return false;
+  if (teacher.role === 'admin' || teacher.role === 'cr' || teacher.role === 'gr') {
+    return true;
+  }
+  if (teacher.role === 'teacher') {
+    const assigned = teacher.assigned_subject_ids || [];
+    return assigned.includes(subjectId);
+  }
+  return false;
+}
+
+export function getTeacherTests(
+  teacherId?: string,
+  subjectId?: string,
+  teacherProfile?: UserProfile | null
+): TeacherTest[] {
   let all = getStored<TeacherTest[]>(TEACHER_TESTS_KEY, []);
   if (teacherId) all = all.filter((t) => t.teacher_id === teacherId);
   if (subjectId) all = all.filter((t) => t.subject_id === subjectId);
+  if (teacherProfile && teacherProfile.role === 'teacher') {
+    const assigned = new Set(teacherProfile.assigned_subject_ids || []);
+    all = all.filter((t) => assigned.has(t.subject_id));
+  }
   return all;
 }
 
-export function saveTeacherTest(test: TeacherTest): TeacherTest {
+export function saveTeacherTest(test: TeacherTest, teacherProfile?: UserProfile | null): TeacherTest {
+  if (teacherProfile && !validateTeacherSubjectAccess(teacherProfile, test.subject_id)) {
+    throw new Error(
+      `Access Denied: You are not authorized to create or manage tests for subject ID "${test.subject_id}".`
+    );
+  }
+
   const all = getTeacherTests();
   const existingIdx = all.findIndex((t) => t.id === test.id);
+  const existing = existingIdx !== -1 ? all[existingIdx] : undefined;
   const now = new Date().toISOString();
 
   if (existingIdx !== -1) {
@@ -616,6 +668,39 @@ export function saveTeacherTest(test: TeacherTest): TeacherTest {
 
   setStored(TEACHER_TESTS_KEY, all);
   dispatchCustomEvent('studyhub_teacher_tests_updated');
+
+  // Trigger Notifications:
+  // Only published tests trigger notifications; drafts are NEVER broadcast.
+  const isNewlyPublished = test.status === 'published' && (!existing || existing.status !== 'published');
+  const isScheduleChanged =
+    existing &&
+    existing.test_date !== test.test_date &&
+    test.status !== 'draft';
+
+  const subjects = getDemoSubjects();
+  const subject = subjects.find((s) => s.id === test.subject_id);
+  const subjectName = subject?.name || 'Class Subject';
+
+  if (isNewlyPublished) {
+    notifyTestPublished({
+      id: test.id,
+      title: test.title,
+      subject_id: test.subject_id,
+      subject_name: subjectName,
+      total_questions: test.questions?.length || 0,
+      duration_minutes: test.duration_minutes || 45,
+      test_date: test.test_date,
+    });
+  } else if (isScheduleChanged) {
+    notifyTestScheduleUpdated({
+      id: test.id,
+      title: test.title,
+      subject_id: test.subject_id,
+      subject_name: subjectName,
+      test_date: test.test_date,
+    });
+  }
+
   return test;
 }
 
@@ -631,7 +716,12 @@ export function getQuestionBank(subjectId?: string): TestQuestion[] {
   return all;
 }
 
-export function saveQuestionBankItem(question: TestQuestion): TestQuestion {
+export function saveQuestionBankItem(question: TestQuestion, teacherProfile?: UserProfile | null): TestQuestion {
+  if (teacherProfile && !validateTeacherSubjectAccess(teacherProfile, question.subject_id)) {
+    throw new Error(
+      `Access Denied: You are not authorized to add questions for subject ID "${question.subject_id}".`
+    );
+  }
   const all = getQuestionBank();
   const existingIdx = all.findIndex((q) => q.id === question.id);
   if (existingIdx !== -1) {

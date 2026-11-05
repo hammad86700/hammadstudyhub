@@ -1,6 +1,6 @@
 // ==============================================================================
-// HAMMAD STUDYHUB — NOTIFICATION BELL COMPONENT
-// Header dropdown displaying new academic materials and important announcements
+// HAMMAD STUDYHUB — UNIFIED NOTIFICATION BELL COMPONENT
+// Header dropdown displaying real-time tests, polls, materials, and reports
 // ==============================================================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -10,57 +10,110 @@ import {
   FileText,
   AlertCircle,
   Check,
-  ExternalLink,
+  ClipboardCheck,
+  MessageSquare,
+  ShieldAlert,
+  Clock,
   Sparkles,
-  X,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import {
   getStudentNotifications,
-  getUnreadNotificationCount,
+  getNotificationsForUser,
+  markPersistentNotificationRead,
+  markAllPersistentNotificationsRead,
   markNotificationAsRead,
   markAllNotificationsAsRead,
-  StudentNotification,
 } from '../../lib/notifications';
 import { formatRelativeTime } from '../../lib/utils';
 import { useResources } from '../../hooks/useResources';
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 
+interface UnifiedNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  targetUrl: string;
+  createdAt: string;
+  isRead: boolean;
+  priority?: boolean;
+  badgeLabel?: string;
+}
+
 export const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { profile } = useAuth();
 
   const { data: resources } = useResources(undefined, undefined, { includeDrafts: false });
   const { data: announcements } = useAnnouncements();
 
-  const [notifications, setNotifications] = useState<StudentNotification[]>(() =>
-    getStudentNotifications(resources, announcements)
-  );
-  const [unreadCount, setUnreadCount] = useState<number>(() =>
-    getUnreadNotificationCount(notifications)
-  );
+  const [notifications, setNotifications] = useState<UnifiedNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   const refreshNotifs = () => {
-    const list = getStudentNotifications(resources, announcements);
-    setNotifications(list);
-    setUnreadCount(getUnreadNotificationCount(list));
+    const legacy = getStudentNotifications(resources, announcements);
+    const persistent = profile ? getNotificationsForUser(profile) : [];
+
+    const pMapped: UnifiedNotification[] = persistent.map((p) => ({
+      id: p.id,
+      type: p.type,
+      title: p.title,
+      message: p.message,
+      targetUrl: p.target_url,
+      createdAt: p.created_at,
+      isRead: Boolean(p.is_read),
+      priority: p.priority,
+      badgeLabel: p.badge_label || p.type.toUpperCase(),
+    }));
+
+    const combined: UnifiedNotification[] = [...pMapped];
+    legacy.forEach((leg) => {
+      const isDupe = combined.some(
+        (c) => c.id === leg.id || (c.title === leg.title && c.targetUrl === leg.targetUrl)
+      );
+      if (!isDupe) {
+        combined.push({
+          id: leg.id,
+          type: leg.type,
+          title: leg.title,
+          message: leg.message,
+          targetUrl: leg.targetUrl,
+          createdAt: leg.createdAt,
+          isRead: leg.isRead,
+          priority: leg.priority,
+          badgeLabel: leg.badgeLabel,
+        });
+      }
+    });
+
+    combined.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    setNotifications(combined);
+    setUnreadCount(combined.filter((n) => !n.isRead).length);
   };
 
   useEffect(() => {
     refreshNotifs();
-  }, [resources, announcements]);
+  }, [profile, resources, announcements]);
 
   useEffect(() => {
     const handleUpdate = () => refreshNotifs();
     window.addEventListener('studyhub_notifications_updated', handleUpdate);
     window.addEventListener('studyhub_resources_updated', handleUpdate);
     window.addEventListener('studyhub_announcements_updated', handleUpdate);
+    window.addEventListener('studyhub_teacher_tests_updated', handleUpdate);
+    window.addEventListener('studyhub_polls_updated', handleUpdate);
+
     return () => {
       window.removeEventListener('studyhub_notifications_updated', handleUpdate);
       window.removeEventListener('studyhub_resources_updated', handleUpdate);
       window.removeEventListener('studyhub_announcements_updated', handleUpdate);
+      window.removeEventListener('studyhub_teacher_tests_updated', handleUpdate);
+      window.removeEventListener('studyhub_polls_updated', handleUpdate);
     };
-  }, [resources, announcements]);
+  }, [profile, resources, announcements]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -75,7 +128,10 @@ export const NotificationBell: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  const handleNotificationClick = (notif: StudentNotification) => {
+  const handleNotificationClick = (notif: UnifiedNotification) => {
+    if (profile) {
+      markPersistentNotificationRead(notif.id, profile.id);
+    }
     markNotificationAsRead(notif.id);
     refreshNotifs();
     setIsOpen(false);
@@ -83,8 +139,55 @@ export const NotificationBell: React.FC = () => {
   };
 
   const handleMarkAllRead = () => {
-    markAllNotificationsAsRead(notifications);
+    if (profile) {
+      markAllPersistentNotificationsRead(profile.id);
+    }
+    markAllNotificationsAsRead();
     refreshNotifs();
+  };
+
+  const getNotifIcon = (type: string, priority?: boolean) => {
+    switch (type) {
+      case 'test_published':
+      case 'test_schedule_updated':
+        return (
+          <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 flex items-center justify-center shrink-0">
+            <ClipboardCheck className="w-4 h-4" />
+          </div>
+        );
+      case 'poll_published':
+      case 'poll_response_received':
+        return (
+          <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 flex items-center justify-center shrink-0">
+            <MessageSquare className="w-4 h-4" />
+          </div>
+        );
+      case 'report_submitted':
+      case 'report_published':
+        return (
+          <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 flex items-center justify-center shrink-0">
+            <ShieldAlert className="w-4 h-4" />
+          </div>
+        );
+      case 'announcement':
+        return (
+          <div
+            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+              priority
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
+                : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400'
+            }`}
+          >
+            <Bell className="w-4 h-4" />
+          </div>
+        );
+      default:
+        return (
+          <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <FileText className="w-4 h-4" />
+          </div>
+        );
+    }
   };
 
   return (
@@ -93,8 +196,8 @@ export const NotificationBell: React.FC = () => {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/70 transition-colors focus:outline-none"
-        title="Notifications (New materials & announcements)"
+        className="relative p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer"
+        title="Notifications"
         aria-label="Notifications"
       >
         <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -125,7 +228,7 @@ export const NotificationBell: React.FC = () => {
               <button
                 type="button"
                 onClick={handleMarkAllRead}
-                className="text-[11px] font-semibold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
+                className="text-[11px] font-semibold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <Check className="w-3 h-3" />
                 <span>Mark all read</span>
@@ -142,7 +245,7 @@ export const NotificationBell: React.FC = () => {
                   No notifications yet
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  Updates on new lecture notes and announcements will appear here.
+                  Updates on tests, polls, materials, and announcements will appear here.
                 </p>
               </div>
             ) : (
@@ -154,21 +257,7 @@ export const NotificationBell: React.FC = () => {
                     !notif.isRead ? 'bg-brand-50/30 dark:bg-brand-950/20' : ''
                   }`}
                 >
-                  <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                      notif.type === 'announcement'
-                        ? notif.priority
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
-                          : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400'
-                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                    }`}
-                  >
-                    {notif.type === 'announcement' ? (
-                      <Bell className="w-4 h-4" />
-                    ) : (
-                      <FileText className="w-4 h-4" />
-                    )}
-                  </div>
+                  {getNotifIcon(notif.type, notif.priority)}
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
@@ -182,9 +271,16 @@ export const NotificationBell: React.FC = () => {
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">
                       {notif.message}
                     </p>
-                    <span className="text-[10px] text-slate-400 mt-1 block">
-                      {formatRelativeTime(notif.createdAt)}
-                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      {notif.badgeLabel && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-navy-800 text-slate-600 dark:text-slate-300">
+                          {notif.badgeLabel}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400">
+                        {formatRelativeTime(notif.createdAt)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))
@@ -199,7 +295,7 @@ export const NotificationBell: React.FC = () => {
                 setIsOpen(false);
                 navigate('/announcements');
               }}
-              className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+              className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors cursor-pointer"
             >
               View All Announcements &rarr;
             </button>
@@ -209,4 +305,3 @@ export const NotificationBell: React.FC = () => {
     </div>
   );
 };
-
